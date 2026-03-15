@@ -1,0 +1,1782 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>保良局羅氏基金中學 - 樂器班點名系統</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: "Microsoft JhengHei", "PingFang TC", sans-serif; background: #f0f2f5; color: #333; }
+
+/* Header */
+.header { background: linear-gradient(135deg, #1a5276, #2980b9); color: white; padding: 15px 20px; text-align: center; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+.header h1 { font-size: 20px; margin-bottom: 4px; }
+.header h2 { font-size: 14px; font-weight: normal; opacity: 0.9; }
+
+/* Login Page */
+.login-container { max-width: 400px; margin: 80px auto; background: white; border-radius: 12px; padding: 40px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+.login-container h3 { text-align: center; margin-bottom: 25px; font-size: 22px; color: #1a5276; }
+.login-container select, .login-container button { width: 100%; padding: 12px; font-size: 16px; border-radius: 8px; margin-bottom: 15px; }
+.login-container select { border: 2px solid #ddd; background: white; appearance: auto; }
+.login-container select:focus { border-color: #2980b9; outline: none; }
+
+/* Buttons */
+.btn { padding: 10px 20px; border: none; border-radius: 8px; font-size: 15px; cursor: pointer; transition: all 0.2s; }
+.btn-primary { background: #2980b9; color: white; }
+.btn-primary:hover { background: #1a5276; }
+.btn-success { background: #27ae60; color: white; }
+.btn-success:hover { background: #1e8449; }
+.btn-danger { background: #e74c3c; color: white; }
+.btn-danger:hover { background: #c0392b; }
+.btn-secondary { background: #95a5a6; color: white; }
+.btn-secondary:hover { background: #7f8c8d; }
+.btn-admin { background: #8e44ad; color: white; }
+.btn-admin:hover { background: #6c3483; }
+.btn-block { width: 100%; display: block; }
+
+/* Navigation */
+.nav-bar { background: white; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ddd; }
+.nav-bar .tutor-name { font-size: 16px; font-weight: bold; color: #1a5276; }
+.nav-bar .nav-btns { display: flex; gap: 8px; }
+
+/* Content */
+.container { max-width: 900px; margin: 20px auto; padding: 0 15px; }
+
+/* Class Card */
+.class-card { background: white; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); overflow: hidden; }
+.class-header { background: #ecf0f1; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ddd; }
+.class-header h3 { font-size: 17px; color: #1a5276; }
+.class-info { font-size: 13px; color: #666; }
+
+/* Student Row */
+.student-row { display: flex; align-items: center; padding: 12px 20px; border-bottom: 1px solid #f0f0f0; transition: background 0.2s; }
+.student-row:last-child { border-bottom: none; }
+.student-row.absent { background: #fdf2f2; }
+.student-index { width: 30px; font-size: 13px; color: #999; }
+.student-class { width: 60px; font-size: 13px; color: #666; font-family: monospace; }
+.student-name { flex: 1; font-size: 15px; }
+.student-status { display: flex; align-items: center; gap: 8px; }
+.status-badge { padding: 4px 12px; border-radius: 20px; font-size: 13px; cursor: pointer; user-select: none; }
+.status-present { background: #d5f5e3; color: #1e8449; }
+.status-absent { background: #fadbd8; color: #c0392b; }
+
+/* Reason Select */
+.reason-select { padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; background: white; }
+
+/* Date Picker */
+.date-section { background: white; border-radius: 12px; padding: 15px 20px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); display: flex; align-items: center; gap: 15px; }
+.date-section label { font-size: 15px; font-weight: bold; }
+.date-input { padding: 8px 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 15px; }
+.date-input:focus { border-color: #2980b9; outline: none; }
+
+/* Summary */
+.summary-bar { background: white; border-radius: 12px; padding: 15px 20px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); display: flex; justify-content: space-around; text-align: center; }
+.summary-item { }
+.summary-item .num { font-size: 28px; font-weight: bold; }
+.summary-item .label { font-size: 13px; color: #666; margin-top: 4px; }
+.num-total { color: #2980b9; }
+.num-present { color: #27ae60; }
+.num-absent { color: #e74c3c; }
+
+/* Submit Section */
+.submit-section { text-align: center; padding: 20px 0 40px; }
+
+/* Admin Page */
+.admin-container { max-width: 1100px; margin: 20px auto; padding: 0 15px; }
+.report-filters { background: white; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
+.filter-row { display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-end; }
+.filter-group { display: flex; flex-direction: column; gap: 5px; }
+.filter-group label { font-size: 13px; font-weight: bold; color: #666; }
+.filter-group select, .filter-group input { padding: 8px 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 14px; }
+
+/* Report Table */
+.report-table { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
+.report-table th { background: #1a5276; color: white; padding: 12px 15px; text-align: left; font-size: 14px; }
+.report-table { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.report-table table { min-width: 800px; }
+.report-table td { padding: 10px 15px; border-bottom: 1px solid #f0f0f0; font-size: 14px; white-space: nowrap; }
+.report-table th { position: sticky; top: 0; z-index: 10; white-space: nowrap; }
+.report-table .absent-reason { color: #e74c3c; font-weight: bold; }
+
+/* Toast */
+.toast { position: fixed; top: 80px; left: 50%; transform: translateX(-50%); background: #27ae60; color: white; padding: 12px 30px; border-radius: 8px; font-size: 15px; z-index: 200; display: none; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+.toast.error { background: #e74c3c; }
+
+/* Hidden */
+.hidden { display: none !important; }
+
+/* Mobile */
+@media (max-width: 600px) {
+  .student-row { flex-wrap: wrap; padding: 10px 15px; }
+  .student-status { width: 100%; margin-top: 8px; justify-content: flex-end; }
+  .filter-row { flex-direction: column; }
+  .summary-bar { flex-wrap: wrap; gap: 10px; }
+  .nav-bar { flex-direction: column; gap: 8px; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>保良局羅氏基金中學</h1>
+  <h2>2025-2026 樂器班點名系統</h2>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- LOGIN PAGE -->
+<div id="page-login">
+  <div class="login-container">
+    <h3>導師登入</h3>
+    <select id="tutor-select">
+      <option value="">-- 請選擇導師 --</option>
+    </select>
+    <button class="btn btn-primary btn-block" onclick="loginTutor()">登入</button>
+    <hr style="margin: 20px 0; border: none; border-top: 1px solid #eee;">
+    <button class="btn btn-admin btn-block" onclick="showAdminLogin()">管理員面板</button>
+  </div>
+</div>
+
+<!-- ADMIN LOGIN MODAL -->
+<div id="admin-login-modal" class="hidden">
+  <div class="login-container">
+    <h3>管理員登入</h3>
+    <input type="password" id="admin-password" placeholder="請輸入管理員密碼" style="width:100%; padding:12px; font-size:16px; border-radius:8px; margin-bottom:15px; border:2px solid #ddd;" onkeydown="if(event.key==='Enter') checkAdminPassword()">
+    <button class="btn btn-admin btn-block" onclick="checkAdminPassword()">登入</button>
+    <button class="btn btn-secondary btn-block" onclick="hideAdminLogin()">返回</button>
+  </div>
+</div>
+
+<!-- ATTENDANCE PAGE -->
+<div id="page-attendance" class="hidden">
+  <div class="nav-bar">
+    <span class="tutor-name" id="nav-tutor-name"></span>
+    <div class="nav-btns">
+      <button class="btn btn-primary" onclick="logout()">主頁</button>
+    </div>
+  </div>
+  <div class="container">
+    <div class="date-section">
+      <label>上課日期：</label>
+      <select class="date-input" id="attendance-date"></select>
+    </div>
+    <div class="summary-bar" id="summary-bar">
+      <div class="summary-item"><div class="num num-total" id="sum-total">0</div><div class="label">總人數</div></div>
+      <div class="summary-item"><div class="num num-present" id="sum-present">0</div><div class="label">出席</div></div>
+      <div class="summary-item"><div class="num num-absent" id="sum-absent">0</div><div class="label">缺席</div></div>
+    </div>
+    <div id="class-list"></div>
+    <div class="submit-section">
+      <p style="color:#999; font-size:13px; margin-bottom:12px;">如提交資料有誤，請聯絡管理員修正。</p>
+      <button class="btn btn-success" id="submit-btn" style="padding: 14px 60px; font-size: 17px;" onclick="submitAttendance()">提交點名記錄</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADMIN PAGE -->
+<div id="page-admin" class="hidden">
+  <div class="nav-bar">
+    <span class="tutor-name">管理員面板</span>
+    <div class="nav-btns">
+      <button class="btn btn-primary" onclick="logout()">主頁</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <!-- Date selector -->
+    <div class="card" style="margin-bottom: 15px;">
+      <div style="display:flex; align-items:center; gap:15px;">
+        <label style="font-weight:bold; white-space:nowrap;">上課日期：</label>
+        <select id="filter-date" class="date-input" onchange="loadReport()" style="flex:1; padding:10px; font-size:15px; border-radius:8px; border:2px solid #ddd;"></select>
+      </div>
+    </div>
+
+    <!-- Tutor submission status -->
+    <div class="card" style="margin-bottom: 15px;">
+      <h4 style="margin-bottom: 10px;">導師提交狀態</h4>
+      <div id="tutor-status-list"></div>
+    </div>
+
+    <!-- Full student report -->
+    <div class="card">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <h4>出席報告（全部學生）</h4>
+        <button class="btn btn-success" onclick="exportCSV()">匯出報告 (Excel)</button>
+      </div>
+      <div class="report-table">
+        <table id="report-table">
+          <thead>
+            <tr>
+              <th>導師</th>
+              <th>樂器</th>
+              <th>時間</th>
+              <th>課室</th>
+              <th>班別學號</th>
+              <th>學生姓名</th>
+              <th>狀態</th>
+              <th>缺席原因</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ==================== STUDENT DATA ====================
+const TUTOR_DATA = {
+  "Mr. Willy Tan": {
+    "Erhu": {
+      "time": "09:00-10:00",
+      "room": "202",
+      "students": [
+        {
+          "class_no": "2J23",
+          "name": "吳威進",
+          "phone": "53152084 / 69862819 / 93556283"
+        },
+        {
+          "class_no": "2S2",
+          "name": "陳峮譽",
+          "phone": "63006873 / 93866481"
+        },
+        {
+          "class_no": "2V31",
+          "name": "黃日謙",
+          "phone": "98468438 / 98666515"
+        }
+      ]
+    },
+    "Violin": {
+      "time": "10:00-11:00",
+      "room": "202",
+      "students": [
+        {
+          "class_no": "3N31",
+          "name": "司徒文𠵍",
+          "phone": "60677446 / 91095550"
+        },
+        {
+          "class_no": "3S6",
+          "name": "陳玥澄",
+          "phone": "69627333 / 64330005"
+        },
+        {
+          "class_no": "3S34",
+          "name": "胡灝賢",
+          "phone": "62839832 / 94080936"
+        }
+      ]
+    },
+    "Lower String": {
+      "time": "11:00-12:00",
+      "room": "202",
+      "students": [
+        {
+          "class_no": "2J30",
+          "name": "曾凱晴",
+          "phone": "60924931 / 69993204"
+        },
+        {
+          "class_no": "2N14",
+          "name": "關伊晴",
+          "phone": "93874371 / 61249871"
+        },
+        {
+          "class_no": "2V37",
+          "name": "葉雲博",
+          "phone": "64086975 / 97793882"
+        },
+        {
+          "class_no": "3J37",
+          "name": "黃子軒",
+          "phone": "97037622 / 64130813"
+        }
+      ]
+    }
+  },
+  "Ms. Chung Yan Qiu": {
+    "Drum Set": {
+      "time": "09:00-10:00",
+      "room": "Mus",
+      "students": [
+        {
+          "class_no": "2M32",
+          "name": "韋嘉俊",
+          "phone": "54895669 / 96863820"
+        },
+        {
+          "class_no": "3J17",
+          "name": "孔慶平",
+          "phone": "98145455 / 97212209"
+        },
+        {
+          "class_no": "3N34",
+          "name": "杜浚賢",
+          "phone": "98141622 / 94875998"
+        },
+        {
+          "class_no": "3V27",
+          "name": "曾卓藍",
+          "phone": "66469494 / 90411090"
+        }
+      ]
+    },
+    "Guzheng A": {
+      "time": "10:00-11:00",
+      "room": "Mus",
+      "students": [
+        {
+          "class_no": "1M31",
+          "name": "黃梓喬",
+          "phone": "66200883 / 91554293"
+        },
+        {
+          "class_no": "1V6",
+          "name": "張梓晴",
+          "phone": "54199764 / 92506250"
+        },
+        {
+          "class_no": "1V11",
+          "name": "周樂悠",
+          "phone": "93701366 / 92861836"
+        },
+        {
+          "class_no": "2M38",
+          "name": "楊爾瑩",
+          "phone": "5418 4268 / 9776 4612"
+        }
+      ]
+    },
+    "Guzheng B": {
+      "time": "11:00-12:00",
+      "room": "Mus",
+      "students": [
+        {
+          "class_no": "1V33",
+          "name": "楊桂嬅",
+          "phone": "96767977 / 96416211"
+        },
+        {
+          "class_no": "2J25",
+          "name": "孫啟程",
+          "phone": "61987479 / 96835662"
+        },
+        {
+          "class_no": "2M12",
+          "name": "黃乙珊",
+          "phone": "91683610 / 98344091"
+        },
+        {
+          "class_no": "3J32",
+          "name": "譚稀慈",
+          "phone": "96198994 / 60775665"
+        }
+      ]
+    }
+  },
+  "Ms. Wang Kei Han": {
+    "Ruan": {
+      "time": "10:00-11:00",
+      "room": "204",
+      "students": [
+        {
+          "class_no": "1S30",
+          "name": "吳泓錫",
+          "phone": "67472339 / 95073939"
+        },
+        {
+          "class_no": "1V37",
+          "name": "趙奕赫",
+          "phone": "69272958 / 65874712"
+        }
+      ]
+    },
+    "Pipa": {
+      "time": "11:00-12:00",
+      "room": "204",
+      "students": [
+        {
+          "class_no": "1N29",
+          "name": "鄧芷妤",
+          "phone": "65353612 / 93535505"
+        },
+        {
+          "class_no": "1N33",
+          "name": "楊梓晴",
+          "phone": "55057992 / 93794375"
+        },
+        {
+          "class_no": "1V20",
+          "name": "劉蔚欣",
+          "phone": "92659823 / 96331168"
+        },
+        {
+          "class_no": "2J17",
+          "name": "劉穎瑤",
+          "phone": "63612155 / 62293739"
+        },
+        {
+          "class_no": "2N11",
+          "name": "何肇倫",
+          "phone": "64790417 / 59864941"
+        }
+      ]
+    }
+  },
+  "Mr. Lo Yun Shing": {
+    "Guitar / Ukulele A": {
+      "time": "09:00-10:00",
+      "room": "205",
+      "students": [
+        {
+          "class_no": "3J12",
+          "name": "朱偉軒",
+          "phone": "61535445 / 62701056"
+        },
+        {
+          "class_no": "3M12",
+          "name": "古卓堯",
+          "phone": "97611955 / 97760110"
+        },
+        {
+          "class_no": "3M15",
+          "name": "藍楚晞",
+          "phone": "66028028 / 97404998"
+        },
+        {
+          "class_no": "3N38",
+          "name": "黃雋然",
+          "phone": "63468018 / 94901834"
+        },
+        {
+          "class_no": "3V25",
+          "name": "蕭芷欣",
+          "phone": "67617788 / 97018846"
+        }
+      ]
+    },
+    "Guitar / Ukulele B": {
+      "time": "10:00-11:00",
+      "room": "205",
+      "students": [
+        {
+          "class_no": "3M37",
+          "name": "華家朗",
+          "phone": "67565003 / 61719743"
+        },
+        {
+          "class_no": "3S24",
+          "name": "布筱言",
+          "phone": "68286567 / 64071488"
+        },
+        {
+          "class_no": "3V22",
+          "name": "潘顥洋",
+          "phone": "61611631 / 98185813"
+        },
+        {
+          "class_no": "3S30",
+          "name": "鄧駱希",
+          "phone": "63022989 / 53623264"
+        },
+        {
+          "class_no": "3V30",
+          "name": "黃曉悅",
+          "phone": "97997596 / 67738509"
+        }
+      ]
+    },
+    "Guitar / Ukulele C": {
+      "time": "11:00-12:00",
+      "room": "205",
+      "students": [
+        {
+          "class_no": "3N19",
+          "name": "羅諾澄",
+          "phone": "90179812 / 96619090"
+        },
+        {
+          "class_no": "3V6",
+          "name": "鍾名傑",
+          "phone": "51247120 / 62253837"
+        },
+        {
+          "class_no": "3J36",
+          "name": "黃啟峰",
+          "phone": "93606389 / 98339270"
+        },
+        {
+          "class_no": "3M3",
+          "name": "陳庭臻",
+          "phone": "94380966 / 96084563"
+        },
+        {
+          "class_no": "3V26",
+          "name": "譚日晞",
+          "phone": "59297185 / 93243993"
+        }
+      ]
+    },
+    "Guitar / Ukulele D": {
+      "time": "13:00-14:00",
+      "room": "205",
+      "students": [
+        {
+          "class_no": "3J39",
+          "name": "袁康晴",
+          "phone": "60188613 / 92672775"
+        },
+        {
+          "class_no": "3S12",
+          "name": "鄺啓燊",
+          "phone": "62823793 / 97503007"
+        },
+        {
+          "class_no": "3M10",
+          "name": "許浚謙",
+          "phone": "62246222 / 93873160"
+        },
+        {
+          "class_no": "3N21",
+          "name": "李姸慧",
+          "phone": "67569278 / 68216300"
+        },
+        {
+          "class_no": "3S8",
+          "name": "許凱晴",
+          "phone": "69726206 / 95880707"
+        }
+      ]
+    }
+  },
+  "Ms. Tai Yue Yan Karis": {
+    "Percussion A": {
+      "time": "09:00-10:00",
+      "room": "N402",
+      "students": [
+        {
+          "class_no": "1J2",
+          "name": "陳希卓",
+          "phone": "95368180 / 92365036"
+        },
+        {
+          "class_no": "1J13",
+          "name": "劉愷珞",
+          "phone": "62896736 / 55912882"
+        },
+        {
+          "class_no": "1J15",
+          "name": "李啟樂",
+          "phone": "98781477 / 91696907"
+        },
+        {
+          "class_no": "1J31",
+          "name": "鄧亦喬",
+          "phone": "67995943 / 56919945"
+        },
+        {
+          "class_no": "1J36",
+          "name": "楊一信",
+          "phone": "94113365 / 96420056"
+        }
+      ]
+    },
+    "Percussion C": {
+      "time": "10:00-11:00",
+      "room": "N402",
+      "students": [
+        {
+          "class_no": "1N3",
+          "name": "陳尚樂",
+          "phone": "96130829 / 93321632"
+        },
+        {
+          "class_no": "1N22",
+          "name": "李真熙",
+          "phone": "98150391 / 62548779"
+        },
+        {
+          "class_no": "1S16",
+          "name": "林偉霆",
+          "phone": "53414393 / 92879073"
+        },
+        {
+          "class_no": "2J34",
+          "name": "黄梓樂",
+          "phone": "94692025 / 93873055"
+        },
+        {
+          "class_no": "2J35",
+          "name": "黃煒竣",
+          "phone": "62980166 / 96130298"
+        }
+      ]
+    },
+    "Percussion E": {
+      "time": "11:00-12:00",
+      "room": "N402",
+      "students": [
+        {
+          "class_no": "1J24",
+          "name": "吳倬綸",
+          "phone": "65505863 / 92831027"
+        },
+        {
+          "class_no": "1S5",
+          "name": "張爾晉",
+          "phone": "54099077 / 60129978"
+        },
+        {
+          "class_no": "2V13",
+          "name": "林溢晴",
+          "phone": "56627782 / 92822673"
+        },
+        {
+          "class_no": "3M33",
+          "name": "蕭頌昇",
+          "phone": "61948806 / 92123317"
+        },
+        {
+          "class_no": "3V32",
+          "name": "黃啟軒",
+          "phone": "66893520 / 98339270"
+        }
+      ]
+    }
+  },
+  "Mr. Tai Po Lun": {
+    "Percussion B": {
+      "time": "09:00-10:00",
+      "room": "206",
+      "students": [
+        {
+          "class_no": "1S2",
+          "name": "陳天行",
+          "phone": "96632940 / 93077401"
+        },
+        {
+          "class_no": "1S22",
+          "name": "孫晞晴",
+          "phone": "56442970 / 61210258"
+        },
+        {
+          "class_no": "1S27",
+          "name": "王梓樂",
+          "phone": "55461978 / 92160832"
+        },
+        {
+          "class_no": "1V5",
+          "name": "鄒卓男",
+          "phone": "9085 6884 / 96863477"
+        },
+        {
+          "class_no": "1V32",
+          "name": "黃樂希",
+          "phone": "66713931 / 98583334"
+        }
+      ]
+    },
+    "Percussion D": {
+      "time": "10:00-11:00",
+      "room": "206",
+      "students": [
+        {
+          "class_no": "1M6",
+          "name": "朱舜羲",
+          "phone": "51154873 / 96282308"
+        },
+        {
+          "class_no": "1M14",
+          "name": "羅曉悠",
+          "phone": "97923006 (whatsapp) / 90291719"
+        },
+        {
+          "class_no": "1S31",
+          "name": "邱子維",
+          "phone": "91226683 / 97355513"
+        },
+        {
+          "class_no": "1V24",
+          "name": "陸孝揚",
+          "phone": "94498820 / 93575864"
+        },
+        {
+          "class_no": "3M17",
+          "name": "李皓旻",
+          "phone": "54204647 / 96562589"
+        }
+      ]
+    }
+  },
+  "Mr. Brain Wu": {
+    "Percussion F": {
+      "time": "12:00-13:00",
+      "room": "N402",
+      "students": [
+        {
+          "class_no": "1J22",
+          "name": "馬俊豪",
+          "phone": "44200536 / 51172485"
+        },
+        {
+          "class_no": "1V14",
+          "name": "馮維一",
+          "phone": "52824789 / 98223304"
+        },
+        {
+          "class_no": "2M29",
+          "name": "田卓弘",
+          "phone": "59840202 / 95580110"
+        },
+        {
+          "class_no": "2S28",
+          "name": "吳寶楠",
+          "phone": "93166703 / 94355854"
+        },
+        {
+          "class_no": "2V27",
+          "name": "王俏",
+          "phone": "59920510 / 63756636"
+        }
+      ]
+    },
+    "Percussion G": {
+      "time": "13:00-14:00",
+      "room": "N402",
+      "students": [
+        {
+          "class_no": "1N18",
+          "name": "劉熺昕",
+          "phone": "65014024 / 61778138"
+        },
+        {
+          "class_no": "1S21",
+          "name": "蕭靖懷",
+          "phone": "64658462 / 60898902"
+        },
+        {
+          "class_no": "2M37",
+          "name": "楊昊南",
+          "phone": "61981210 / 95169162"
+        },
+        {
+          "class_no": "3J33",
+          "name": "譚緯俊",
+          "phone": "62878871 / 93700895"
+        },
+        {
+          "class_no": "3N35",
+          "name": "王祉潔",
+          "phone": "64195614 / 64208594"
+        }
+      ]
+    }
+  },
+  "Mr. Jack Tang": {
+    "Flute": {
+      "time": "09:00-10:00",
+      "room": "204",
+      "students": [
+        {
+          "class_no": "3J29",
+          "name": "安栢毅",
+          "phone": "63655824 / 61232062"
+        },
+        {
+          "class_no": "3M24",
+          "name": "梁尚頤",
+          "phone": "67140800 / 94078297"
+        },
+        {
+          "class_no": "3N16",
+          "name": "洪一心",
+          "phone": "64260754 / 92128535"
+        },
+        {
+          "class_no": "3N39",
+          "name": "余建霆",
+          "phone": "55748159 / 97268220"
+        },
+        {
+          "class_no": "3S32",
+          "name": "黃承康",
+          "phone": "97919725 / 92838901"
+        }
+      ]
+    }
+  },
+  "Mr. Kwong Long Yin": {
+    "Dizi A": {
+      "time": "09:00-10:00",
+      "room": "106",
+      "students": [
+        {
+          "class_no": "1J5",
+          "name": "陳緯晉",
+          "phone": "68270411 / 97217655"
+        },
+        {
+          "class_no": "1N7",
+          "name": "周幸姸",
+          "phone": "55184625 / 97178850"
+        },
+        {
+          "class_no": "1N26",
+          "name": "莫銘琋",
+          "phone": "91204408 / 97478443"
+        },
+        {
+          "class_no": "1N32",
+          "name": "黃天衡",
+          "phone": "68866290 / 95116115"
+        },
+        {
+          "class_no": "1V34",
+          "name": "楊芷霖",
+          "phone": "65854898 / 65712429"
+        }
+      ]
+    }
+  },
+  "Mr. Ma Wai Him": {
+    "Dizi B": {
+      "time": "09:00-10:00",
+      "room": "203",
+      "students": [
+        {
+          "class_no": "2N8",
+          "name": "周灝正",
+          "phone": "54985105 / 93560272"
+        },
+        {
+          "class_no": "2S11",
+          "name": "张子悠",
+          "phone": ""
+        },
+        {
+          "class_no": "2S22",
+          "name": "羅嘉進",
+          "phone": "54244853 / 97710168"
+        },
+        {
+          "class_no": "2S26",
+          "name": "陸振程",
+          "phone": "68005198 / 51729382"
+        }
+      ]
+    },
+    "Dizi C": {
+      "time": "10:00-11:00",
+      "room": "203",
+      "students": [
+        {
+          "class_no": "2M2",
+          "name": "陳亦琪",
+          "phone": "60385197 / 94922484"
+        },
+        {
+          "class_no": "2V6",
+          "name": "鄭弘謙",
+          "phone": "67979210 / 64326631"
+        },
+        {
+          "class_no": "2V16",
+          "name": "李尚玄",
+          "phone": "90290820 / 90290820"
+        },
+        {
+          "class_no": "2V36",
+          "name": "葉千蔚",
+          "phone": "54035229 / 60361127"
+        },
+        {
+          "class_no": "3M28",
+          "name": "盧梓萱",
+          "phone": "44987138 / 52201649"
+        }
+      ]
+    },
+    "Clarinet": {
+      "time": "11:00-12:00",
+      "room": "203",
+      "students": [
+        {
+          "class_no": "3N11",
+          "name": "馮家傑",
+          "phone": "46834815 / 91678897"
+        },
+        {
+          "class_no": "3V4",
+          "name": "張子聰",
+          "phone": "92540501 / 91246870"
+        },
+        {
+          "class_no": "4M28",
+          "name": "袁敬喬",
+          "phone": "59022013 / 95594529"
+        }
+      ]
+    },
+    "Dizi D": {
+      "time": "12:00-13:00",
+      "room": "203",
+      "students": [
+        {
+          "class_no": "2S8",
+          "name": "鄭晞琳",
+          "phone": "93919498 / 94637600"
+        },
+        {
+          "class_no": "3N37",
+          "name": "黃炤叡",
+          "phone": "66701648 / 93465857"
+        },
+        {
+          "class_no": "2M18",
+          "name": "勞栢研",
+          "phone": ""
+        }
+      ]
+    }
+  },
+  "Mr. Wilson Chan": {
+    "Trumpet": {
+      "time": "12:00-13:00",
+      "room": "Mus",
+      "students": [
+        {
+          "class_no": "1S1",
+          "name": "陳藉深",
+          "phone": "97973003 / 92165678"
+        },
+        {
+          "class_no": "1V19",
+          "name": "劉丞浠",
+          "phone": "97231521 / 92397058"
+        },
+        {
+          "class_no": "3J25",
+          "name": "李曜希",
+          "phone": "93102772 / 92770848"
+        },
+        {
+          "class_no": "3N25",
+          "name": "廖倬賢",
+          "phone": "60165729 / 67070289"
+        },
+        {
+          "class_no": "3S2",
+          "name": "陳潮樂",
+          "phone": "66866891 / 95552405"
+        }
+      ]
+    },
+    "Brass Group": {
+      "time": "13:00-14:00",
+      "room": "Mus",
+      "students": [
+        {
+          "class_no": "1J16",
+          "name": "梁嘉皓",
+          "phone": "46260939 / 63555547"
+        },
+        {
+          "class_no": "1M19",
+          "name": "馬峻軒",
+          "phone": "64209036 / 90982051"
+        },
+        {
+          "class_no": "1S17",
+          "name": "劉誦浠",
+          "phone": "97231758 / 92397058"
+        },
+        {
+          "class_no": "2N21",
+          "name": "羅淨暘",
+          "phone": "61075373 / 97231051"
+        },
+        {
+          "class_no": "2N35",
+          "name": "黃子軒",
+          "phone": "97037622 / 64130813"
+        }
+      ]
+    }
+  }
+};
+
+const ABSENCE_REASONS = [
+  "病假",
+  "事假",
+  "學校活動",
+  "學業任務",
+  "無法聯絡",
+  "遲到",
+  "早退",
+  "其他"
+];
+
+const ADMIN_PASSWORD = "lfc2026";
+
+const CLASS_DATES = [
+  "2026-03-28",
+  "2026-04-18", "2026-04-25",
+  "2026-05-02", "2026-05-16", "2026-05-23",
+  "2026-06-27",
+  "2026-07-04", "2026-07-11", "2026-07-18", "2026-07-25",
+  "2026-08-01"
+];
+
+const MONTH_NAMES = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+const DAY_OF_WEEK = ['日','一','二','三','四','五','六'];
+
+// ==================== STATE ====================
+let currentTutor = null;
+let attendanceData = {};
+let adminReportRows = []; // { "student_key": { status: "present"|"absent", reason: "" } }
+
+// (old localStorage removed - using Google Sheets API now)
+
+const API_URL = 'https://script.google.com/macros/s/AKfycbw7JDi_xq-s3hWeTZUG3Um_k0cJpt3IuurA_iPTqNn_Z8ct1OIQscr6TkltD728aXSn/exec';
+
+// ==================== GOOGLE SHEETS API ====================
+async function apiGet(action, params = {}) {
+  const url = new URL(API_URL);
+  url.searchParams.set('action', action);
+  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+  const resp = await fetch(url.toString());
+  return await resp.json();
+}
+
+async function apiPost(action, data) {
+  // Google Apps Script redirects POST requests (302), which causes fetch to
+  // follow the redirect as GET and lose the POST body.
+  // Solution: encode data as base64 in a GET request parameter.
+  const url = new URL(API_URL);
+  url.searchParams.set('action', action);
+  url.searchParams.set('payload', btoa(unescape(encodeURIComponent(JSON.stringify(data)))));
+  try {
+    const resp = await fetch(url.toString());
+    const text = await resp.text();
+    console.log('apiPost raw response:', text);
+    try {
+      return JSON.parse(text);
+    } catch (e) {
+      console.error('apiPost JSON parse error:', e, 'raw:', text);
+      return { error: 'Invalid response from server' };
+    }
+  } catch (err) {
+    console.error('apiPost fetch error:', err);
+    throw err;
+  }
+}
+
+// ==================== STORAGE (Google Sheets) ====================
+function getRecords() {
+  return window._cachedRecords || [];
+}
+
+async function fetchRecords(date) {
+  try {
+    const result = await apiGet('getRecords', { date: date || '' });
+    const grouped = {};
+    (result.records || []).forEach(r => {
+      const key = `${r.date}__${r.tutor}`;
+      if (!grouped[key]) {
+        grouped[key] = { date: r.date, tutor: r.tutor, timestamp: r.timestamp, entries: {} };
+      }
+      const entryKey = `${r.instrument}__${r.classNo}__${r.name}`;
+      grouped[key].entries[entryKey] = {
+        instrument: r.instrument, classNo: r.classNo, name: r.name,
+        status: r.status, reason: r.reason || ''
+      };
+    });
+    window._cachedRecords = Object.values(grouped);
+    return window._cachedRecords;
+  } catch (err) {
+    console.error('fetchRecords error:', err);
+    showToast('無法連線伺服器', true);
+    return [];
+  }
+}
+
+// ==================== INIT ====================
+function init() {
+  const select = document.getElementById('tutor-select');
+
+  const tutors = Object.keys(TUTOR_DATA).sort();
+  tutors.forEach(t => {
+    select.innerHTML += `<option value="${t}">${t}</option>`;
+  });
+
+  // Default date = today or nearest class date
+  const today = new Date().toISOString().split('T')[0];
+  
+  // Set attendance date to nearest class date
+  const dateSelect = document.getElementById('attendance-date');
+  dateSelect.innerHTML = '';
+  CLASS_DATES.forEach(d => {
+    const opt = document.createElement('option');
+    opt.value = d;
+    const dateObj = new Date(d + 'T00:00:00');
+    opt.textContent = `${dateObj.getFullYear()}年${MONTH_NAMES[dateObj.getMonth()]}${dateObj.getDate()}日 (星期${DAY_OF_WEEK[dateObj.getDay()]})`;
+    if (d === today) opt.selected = true;
+    dateSelect.appendChild(opt);
+  });
+  // If today is not a class date, select the nearest future one
+  if (!CLASS_DATES.includes(today)) {
+    const nearest = CLASS_DATES.find(d => d >= today) || CLASS_DATES[CLASS_DATES.length - 1];
+    dateSelect.value = nearest;
+  }
+
+  // Re-check submission status when date changes
+  dateSelect.addEventListener('change', () => {
+    if (currentTutor) checkAlreadySubmitted();
+  });
+
+  // Populate admin date filter - single date select
+  const filterDate = document.getElementById('filter-date');
+  filterDate.innerHTML = '';
+  CLASS_DATES.forEach(d => {
+    const dateObj = new Date(d + 'T00:00:00');
+    const label = `${dateObj.getFullYear()}年${MONTH_NAMES[dateObj.getMonth()]}${dateObj.getDate()}日 (星期${DAY_OF_WEEK[dateObj.getDay()]})`;
+    filterDate.innerHTML += `<option value="${d}">${label}</option>`;
+  });
+  // Default to nearest class date
+  const nearestAdmin = CLASS_DATES.find(d => d >= today) || CLASS_DATES[CLASS_DATES.length - 1];
+  filterDate.value = nearestAdmin;
+}
+
+// ==================== LOGIN / LOGOUT ====================
+function loginTutor() {
+  const tutor = document.getElementById('tutor-select').value;
+  if (!tutor) {
+    showToast('請選擇導師', true);
+    return;
+  }
+  currentTutor = tutor;
+  document.getElementById('nav-tutor-name').textContent = tutor;
+  showPage('page-attendance');
+  renderClassList();
+}
+
+function showAdmin() {
+  showPage('page-admin');
+  loadReport();
+}
+
+function showAdminLogin() {
+  document.getElementById('page-login').classList.add('hidden');
+  document.getElementById('admin-login-modal').classList.remove('hidden');
+  document.getElementById('admin-password').value = '';
+  document.getElementById('admin-password').focus();
+}
+
+function hideAdminLogin() {
+  document.getElementById('admin-login-modal').classList.add('hidden');
+  document.getElementById('page-login').classList.remove('hidden');
+}
+
+function checkAdminPassword() {
+  const pwd = document.getElementById('admin-password').value;
+  if (pwd === ADMIN_PASSWORD) {
+    document.getElementById('admin-login-modal').classList.add('hidden');
+    showAdmin();
+  } else {
+    showToast('密碼錯誤', true);
+  }
+}
+
+function logout() {
+  currentTutor = null;
+  attendanceData = {};
+  document.getElementById('tutor-select').value = '';
+  showPage('page-login');
+}
+
+function showPage(pageId) {
+  ['page-login', 'page-attendance', 'page-admin'].forEach(id => {
+    document.getElementById(id).classList.add('hidden');
+  });
+  document.getElementById(pageId).classList.remove('hidden');
+}
+
+// ==================== RENDER CLASS LIST ====================
+function renderClassList() {
+  const container = document.getElementById('class-list');
+  container.innerHTML = '';
+  attendanceData = {};
+
+  const classes = TUTOR_DATA[currentTutor];
+  let totalStudents = 0;
+
+  Object.entries(classes).forEach(([instrument, info]) => {
+    const card = document.createElement('div');
+    card.className = 'class-card';
+
+    let headerHTML = `
+      <div class="class-header">
+        <h3>${instrument}</h3>
+        <span class="class-info">時間：${info.time} ｜ 課室：${info.room} ｜ 學生：${info.students.length}人</span>
+      </div>
+    `;
+
+    let studentsHTML = '';
+    info.students.forEach((student, idx) => {
+      const key = `${instrument}__${student.class_no}__${student.name}`;
+      attendanceData[key] = { status: 'present', reason: '' };
+      totalStudents++;
+
+      studentsHTML += `
+        <div class="student-row" id="row-${CSS.escape(key)}">
+          <span class="student-index">${idx + 1}</span>
+          <span class="student-class">${student.class_no}</span>
+          <span class="student-name">${student.name} ${student.phone ? '(' + student.phone + ')' : ''}</span>
+          <div class="student-status">
+            <span class="status-badge status-present" id="badge-${CSS.escape(key)}" onclick="toggleStatus('${key}')">出席</span>
+            <select class="reason-select hidden" id="reason-${CSS.escape(key)}" onchange="setReason('${key}', this.value)">
+              <option value="">-- 缺席原因 --</option>
+              ${ABSENCE_REASONS.map(r => `<option value="${r}">${r}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+      `;
+    });
+
+    card.innerHTML = headerHTML + studentsHTML;
+    container.appendChild(card);
+  });
+
+  updateSummary();
+  checkAlreadySubmitted();
+}
+
+async function checkAlreadySubmitted() {
+  const date = document.getElementById('attendance-date').value;
+  await fetchRecords(date);
+  const records = getRecords();
+  const existing = records.find(r => r.date === date && r.tutor.trim() === currentTutor.trim());
+  const btn = document.getElementById('submit-btn');
+  if (existing) {
+    btn.disabled = true;
+    btn.style.background = '#bdc3c7';
+    btn.style.cursor = 'not-allowed';
+    btn.textContent = '已提交';
+  } else {
+    btn.disabled = false;
+    btn.style.background = '#27ae60';
+    btn.style.cursor = 'pointer';
+    btn.textContent = '提交點名記錄';
+  }
+}
+
+function toggleStatus(key) {
+  const data = attendanceData[key];
+  const safeKey = CSS.escape(key);
+
+  if (data.status === 'present') {
+    data.status = 'absent';
+    data.reason = '';
+    document.getElementById(`badge-${safeKey}`).className = 'status-badge status-absent';
+    document.getElementById(`badge-${safeKey}`).textContent = '缺席';
+    document.getElementById(`reason-${safeKey}`).classList.remove('hidden');
+    document.getElementById(`row-${safeKey}`).classList.add('absent');
+  } else {
+    data.status = 'present';
+    data.reason = '';
+    document.getElementById(`badge-${safeKey}`).className = 'status-badge status-present';
+    document.getElementById(`badge-${safeKey}`).textContent = '出席';
+    document.getElementById(`reason-${safeKey}`).classList.add('hidden');
+    document.getElementById(`reason-${safeKey}`).value = '';
+    document.getElementById(`row-${safeKey}`).classList.remove('absent');
+  }
+  updateSummary();
+}
+
+function setReason(key, reason) {
+  attendanceData[key].reason = reason;
+}
+
+function updateSummary() {
+  const keys = Object.keys(attendanceData);
+  const total = keys.length;
+  const absent = keys.filter(k => attendanceData[k].status === 'absent').length;
+  const present = total - absent;
+
+  document.getElementById('sum-total').textContent = total;
+  document.getElementById('sum-present').textContent = present;
+  document.getElementById('sum-absent').textContent = absent;
+}
+
+// ==================== SUBMIT ====================
+async function submitAttendance() {
+  const date = document.getElementById('attendance-date').value;
+  if (!date) {
+    showToast('請選擇日期', true);
+    return;
+  }
+
+  // Check if absent students have reasons
+  const missingReasons = Object.entries(attendanceData)
+    .filter(([k, v]) => v.status === 'absent' && !v.reason)
+    .map(([k]) => k.split('__')[2]);
+
+  if (missingReasons.length > 0) {
+    showToast(`以下缺席學生未填寫原因：${missingReasons.join('、')}`, true);
+    return;
+  }
+
+  // Disable button immediately
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.style.background = '#bdc3c7';
+  btn.style.cursor = 'not-allowed';
+  btn.textContent = '提交中...';
+
+  const entries = [];
+  Object.entries(attendanceData).forEach(([key, val]) => {
+    const [instrument, classNo, name] = key.split('__');
+    entries.push({
+      instrument,
+      classNo,
+      name,
+      status: val.status,
+      reason: val.reason
+    });
+  });
+
+  try {
+    const result = await apiPost('submitAttendance', {
+      date: date,
+      tutor: currentTutor,
+      entries: entries
+    });
+
+    if (result.success) {
+      showToast('點名記錄已成功提交！');
+      btn.textContent = '已提交';
+      // Refresh cache
+      await fetchRecords(date);
+    } else {
+      showToast('提交失敗：' + (result.error || '未知錯誤'), true);
+      btn.disabled = false;
+      btn.style.background = '#27ae60';
+      btn.style.cursor = 'pointer';
+      btn.textContent = '提交點名記錄';
+    }
+  } catch (err) {
+    showToast('網絡錯誤，請重試', true);
+    btn.disabled = false;
+    btn.style.background = '#27ae60';
+    btn.style.cursor = 'pointer';
+    btn.textContent = '提交點名記錄';
+  }
+}
+
+// ==================== ADMIN REPORT ====================
+async function loadReport() {
+  const selectedDate = document.getElementById('filter-date').value;
+  
+  // Show loading
+  document.getElementById('tutor-status-list').innerHTML = '<span style="color:#999;">載入中...</span>';
+  document.getElementById('report-table').getElementsByTagName('tbody')[0].innerHTML = '<tr><td colspan="8" style="text-align:center; color:#999; padding:20px;">載入中...</td></tr>';
+
+  await fetchRecords(selectedDate);
+  const records = getRecords();
+  const tutorNames = Object.keys(TUTOR_DATA);
+
+  // 1. 導師提交狀態
+  const statusHtml = [];
+  tutorNames.forEach(tutor => {
+    const submitted = records.some(r => r.date === selectedDate && r.tutor.trim() === tutor.trim());
+    if (submitted) {
+      statusHtml.push(`<span style="display:inline-flex; align-items:center; gap:6px; margin:4px 8px 4px 0; padding:6px 12px; border-radius:6px; background:#eafaf1; color:#27ae60; font-size:13px; border:1px solid #a9dfbf;">✅ ${tutor} — 已提交 <button onclick="resetTutor('${tutor}')" style="background:#e74c3c; color:#fff; border:none; border-radius:4px; padding:2px 8px; font-size:11px; cursor:pointer;">重置</button></span>`);
+    } else {
+      statusHtml.push(`<span style="display:inline-block; margin:4px 8px 4px 0; padding:6px 12px; border-radius:6px; background:#fdedec; color:#e74c3c; font-size:13px; border:1px solid #f5b7b1;">❌ ${tutor} — 未提交</span>`);
+    }
+  });
+  document.getElementById('tutor-status-list').innerHTML = statusHtml.join('');
+
+  // 2. 完整學生名單
+  const rows = [];
+  tutorNames.forEach(tutor => {
+    const instruments = TUTOR_DATA[tutor];
+    const record = records.find(r => r.date === selectedDate && r.tutor.trim() === tutor.trim());
+
+    Object.keys(instruments).forEach(instrument => {
+      const info = instruments[instrument];
+      info.students.forEach(student => {
+        let status = '';
+        let reason = '';
+        let submitted = false;
+
+        if (record && record.entries) {
+          // Try exact key match first
+          const entryKey = `${instrument}__${student.class_no}__${student.name}`;
+          let entry = record.entries[entryKey];
+          // Fallback: search by name + classNo (handles whitespace/encoding differences)
+          if (!entry) {
+            entry = Object.values(record.entries).find(e =>
+              e.name.trim() === student.name.trim() && e.classNo.trim() === student.class_no.trim() && e.instrument.trim() === instrument.trim()
+            );
+          }
+          // Fallback: match by name only within same instrument
+          if (!entry) {
+            entry = Object.values(record.entries).find(e =>
+              e.name.trim() === student.name.trim() && e.instrument.trim() === instrument.trim()
+            );
+          }
+          if (entry) {
+            status = entry.status;
+            reason = entry.reason || '';
+            submitted = true;
+          }
+        }
+
+        rows.push({
+          date: selectedDate,
+          tutor: tutor,
+          instrument: instrument,
+          time: info.time,
+          room: info.room,
+          classNo: student.class_no,
+          name: student.name,
+          status: status,
+          reason: reason,
+          submitted: submitted
+        });
+      });
+    });
+  });
+
+  adminReportRows = rows;
+
+  // 3. 渲染表格 - 為不同班別分配不同底色
+  const CLASS_COLORS = [
+    '#dbeafe', '#fef3c7', '#d1fae5', '#ede9fe', '#fce7f3',
+    '#cffafe', '#fde68a', '#bbf7d0', '#ddd6fe', '#fbcfe8',
+    '#bae6fd', '#fed7aa', '#a7f3d0', '#c7d2fe', '#f9a8d4',
+    '#a5f3fc', '#fcd34d', '#6ee7b7', '#a5b4fc', '#f472b6',
+    '#67e8f9', '#fbbf24', '#34d399', '#818cf8', '#ec4899',
+    '#22d3ee', '#f59e0b', '#10b981'
+  ];
+  let colorIndex = 0;
+  const instrumentColorMap = {};
+
+  let html = '';
+  rows.forEach((r, idx) => {
+    const instrKey = `${r.tutor}__${r.instrument}`;
+    if (!(instrKey in instrumentColorMap)) {
+      instrumentColorMap[instrKey] = CLASS_COLORS[colorIndex % CLASS_COLORS.length];
+      colorIndex++;
+    }
+
+    let statusCell, reasonCell;
+
+    if (!r.submitted) {
+      statusCell = `<span style="color:#aaa; font-style:italic;">待提交</span>`;
+      reasonCell = `<span style="color:#aaa;">—</span>`;
+    } else {
+      const statusOptions = r.status === 'present'
+        ? `<option value="present" selected>✓ 出席</option><option value="absent">✗ 缺席</option>`
+        : `<option value="present">✓ 出席</option><option value="absent" selected>✗ 缺席</option>`;
+
+      const reasonOptions = ABSENCE_REASONS.map(reason =>
+        `<option value="${reason}" ${r.reason === reason ? 'selected' : ''}>${reason}</option>`
+      ).join('');
+
+      const reasonDisplay = r.status === 'absent' ? '' : 'style="display:none"';
+
+      statusCell = `<select class="reason-select" onchange="adminChangeStatus(${idx}, this.value)">${statusOptions}</select>`;
+      reasonCell = `<select class="reason-select" id="admin-reason-${idx}" onchange="adminChangeReason(${idx}, this.value)" ${reasonDisplay}><option value="">-- 原因 --</option>${reasonOptions}</select>`;
+    }
+
+    const classBg = instrumentColorMap[instrKey];
+    const rowBg = r.status === 'absent' ? 'background:#fff5f5;' : `background:${classBg};`;
+    html += `<tr style="${rowBg}"><td>${r.tutor}</td><td>${r.instrument}</td><td>${r.time}</td><td>${r.room}</td><td>${r.classNo}</td><td>${r.name}</td><td>${statusCell}</td><td>${reasonCell}</td></tr>`;
+  });
+
+  document.getElementById('report-table').getElementsByTagName('tbody')[0].innerHTML = html;
+}
+
+
+// ==================== ADMIN EDIT ====================
+async function adminChangeStatus(idx, newStatus) {
+  const row = adminReportRows[idx];
+
+  try {
+    await apiPost('updateRecord', {
+      date: row.date,
+      tutor: row.tutor,
+      instrument: row.instrument,
+      classNo: row.classNo,
+      name: row.name,
+      status: newStatus,
+      reason: newStatus === 'present' ? '' : row.reason
+    });
+  } catch (err) {
+    showToast('更新失敗', true);
+    return;
+  }
+
+  // Show/hide reason dropdown
+  const reasonEl = document.getElementById(`admin-reason-${idx}`);
+  if (newStatus === 'absent') {
+    reasonEl.style.display = '';
+  } else {
+    reasonEl.style.display = 'none';
+    reasonEl.value = '';
+  }
+
+  row.status = newStatus;
+  if (newStatus === 'present') row.reason = '';
+  showToast('已更新');
+}
+
+async function adminChangeReason(idx, newReason) {
+  const row = adminReportRows[idx];
+
+  try {
+    await apiPost('updateRecord', {
+      date: row.date,
+      tutor: row.tutor,
+      instrument: row.instrument,
+      classNo: row.classNo,
+      name: row.name,
+      status: row.status,
+      reason: newReason
+    });
+  } catch (err) {
+    showToast('更新失敗', true);
+    return;
+  }
+
+  row.reason = newReason;
+  showToast('已更新');
+}
+
+// ==================== RESET TUTOR ====================
+async function resetTutor(tutorName) {
+  const selectedDate = document.getElementById('filter-date').value;
+  if (!confirm(`確定要重置「${tutorName}」在 ${selectedDate} 的出席記錄嗎？\n\n重置後該導師需要重新提交點名。`)) return;
+
+  try {
+    await apiPost('resetAttendance', {
+      date: selectedDate,
+      tutor: tutorName
+    });
+    showToast(`已重置「${tutorName}」的記錄`);
+    loadReport();
+  } catch (err) {
+    showToast('重置失敗：' + err.message, true);
+  }
+}
+
+// ==================== EXPORT ====================
+function exportCSV() {
+  const rows = adminReportRows;
+  if (!rows.length) { showToast('沒有記錄可匯出', true); return; }
+  const selectedDate = document.getElementById('filter-date').value;
+
+  const grouped = {};
+  rows.forEach(r => {
+    const key = `${r.tutor}|||${r.instrument}|||${r.time}|||${r.room}`;
+    if (!grouped[key]) grouped[key] = [];
+    grouped[key].push(r);
+  });
+
+  const wb = XLSX.utils.book_new();
+  const wsData = [];
+  const merges = [];
+  let currentRow = 0;
+
+  const thinBorder = {
+    top: { style: 'thin', color: { rgb: 'AAAAAA' } },
+    bottom: { style: 'thin', color: { rgb: 'AAAAAA' } },
+    left: { style: 'thin', color: { rgb: 'AAAAAA' } },
+    right: { style: 'thin', color: { rgb: 'AAAAAA' } }
+  };
+
+  const CLASS_BG = [
+    'DBEAFE', 'FEF3C7', 'D1FAE5', 'EDE9FE', 'FCE7F3',
+    'CFFAFE', 'FDE68A', 'BBF7D0', 'DDD6FE', 'FBCFE8',
+    'BAE6FD', 'FED7AA', 'A7F3D0', 'C7D2FE', 'F9A8D4'
+  ];
+  let colorIdx = 0;
+
+  // Title
+  wsData.push(['保良局羅氏基金中學 - 樂器班點名報告', '', '', '']);
+  merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: 3 } });
+  currentRow++;
+
+  // Date
+  wsData.push([`日期：${selectedDate}`, '', '', '']);
+  merges.push({ s: { r: 1, c: 0 }, e: { r: 1, c: 3 } });
+  currentRow++;
+
+  // Empty row
+  wsData.push(['', '', '', '']);
+  currentRow++;
+
+  // Summary section
+  const totalStudents = rows.length;
+  const presentCount = rows.filter(r => r.submitted && r.status === 'present').length;
+  const absentCount = rows.filter(r => r.submitted && r.status === 'absent').length;
+  const pendingCount = rows.filter(r => !r.submitted).length;
+  wsData.push([`總人數：${totalStudents}`, `出席：${presentCount}`, `缺席：${absentCount}`, `未提交：${pendingCount}`]);
+  currentRow++;
+
+  // Empty row
+  wsData.push(['', '', '', '']);
+  currentRow++;
+
+  // Each class group
+  Object.entries(grouped).forEach(([key, students]) => {
+    const [tutor, instrument, time, room] = key.split('|||');
+    const bg = CLASS_BG[colorIdx % CLASS_BG.length];
+    colorIdx++;
+
+    const classPresent = students.filter(s => s.submitted && s.status === 'present').length;
+    const classAbsent = students.filter(s => s.submitted && s.status === 'absent').length;
+
+    // Class header - merged across 4 columns
+    wsData.push([`${instrument}  |  導師：${tutor}  |  ${time}  |  課室：${room}  |  出席：${classPresent}/${students.length}`, '', '', '']);
+    merges.push({ s: { r: currentRow, c: 0 }, e: { r: currentRow, c: 3 } });
+    currentRow++;
+
+    // Column headers
+    wsData.push(['班別學號', '學生姓名', '狀態', '缺席原因']);
+    currentRow++;
+
+    // Students
+    students.forEach(r => {
+      const status = r.submitted ? (r.status === 'present' ? '✓ 出席' : '✗ 缺席') : '⏳ 未提交';
+      wsData.push([r.classNo, r.name, status, r.reason || '']);
+      currentRow++;
+    });
+
+    // Empty row
+    wsData.push(['', '', '', '']);
+    currentRow++;
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  ws['!merges'] = merges;
+  ws['!cols'] = [{ wch: 16 }, { wch: 20 }, { wch: 12 }, { wch: 16 }];
+
+  // Style: Title
+  ws['A1'].s = {
+    font: { bold: true, sz: 18, color: { rgb: '1A3C6E' } },
+    alignment: { horizontal: 'left', vertical: 'center' }
+  };
+
+  // Style: Date
+  ws['A2'].s = {
+    font: { bold: true, sz: 13, color: { rgb: '444444' } },
+    alignment: { horizontal: 'left' }
+  };
+
+  // Style: Summary row
+  for (let c = 0; c < 4; c++) {
+    const ref = XLSX.utils.encode_cell({ r: 3, c });
+    if (ws[ref]) {
+      ws[ref].s = {
+        font: { bold: true, sz: 11, color: { rgb: '333333' } },
+        fill: { fgColor: { rgb: 'F2F2F2' } },
+        border: thinBorder,
+        alignment: { horizontal: 'center' }
+      };
+    }
+  }
+
+  // Style each group
+  colorIdx = 0;
+  let row = 5;
+  Object.entries(grouped).forEach(([key, students]) => {
+    const bg = CLASS_BG[colorIdx % CLASS_BG.length];
+    colorIdx++;
+
+    // Class header row
+    for (let c = 0; c < 4; c++) {
+      const ref = XLSX.utils.encode_cell({ r: row, c });
+      if (ws[ref]) {
+        ws[ref].s = {
+          font: { bold: true, sz: 12, color: { rgb: '1A1A1A' } },
+          fill: { fgColor: { rgb: bg } },
+          border: {
+            top: { style: 'medium', color: { rgb: '333333' } },
+            bottom: { style: 'thin', color: { rgb: '999999' } },
+            left: { style: 'thin', color: { rgb: '999999' } },
+            right: { style: 'thin', color: { rgb: '999999' } }
+          },
+          alignment: { horizontal: 'left', vertical: 'center' }
+        };
+      }
+    }
+    row++;
+
+    // Column header row
+    for (let c = 0; c < 4; c++) {
+      const ref = XLSX.utils.encode_cell({ r: row, c });
+      if (ws[ref]) {
+        ws[ref].s = {
+          font: { bold: true, sz: 11, color: { rgb: 'FFFFFF' } },
+          fill: { fgColor: { rgb: '4472C4' } },
+          border: thinBorder,
+          alignment: { horizontal: 'center', vertical: 'center' }
+        };
+      }
+    }
+    row++;
+
+    // Student rows
+    students.forEach((r, si) => {
+      const isAbsent = r.submitted && r.status === 'absent';
+      const isPending = !r.submitted;
+      const stripeBg = si % 2 === 0 ? 'FFFFFF' : 'F8F9FA';
+
+      for (let c = 0; c < 4; c++) {
+        const ref = XLSX.utils.encode_cell({ r: row, c });
+        if (ws[ref]) {
+          ws[ref].s = {
+            font: {
+              sz: 11,
+              color: { rgb: isAbsent ? 'CC0000' : isPending ? '999999' : '333333' },
+              bold: isAbsent
+            },
+            fill: { fgColor: { rgb: isAbsent ? 'FFF0F0' : stripeBg } },
+            border: thinBorder,
+            alignment: { horizontal: c === 0 ? 'center' : (c === 2 ? 'center' : 'left'), vertical: 'center' }
+          };
+        }
+      }
+      row++;
+    });
+
+    // Empty row
+    row++;
+  });
+
+  XLSX.utils.book_append_sheet(wb, ws, '點名報告');
+  XLSX.writeFile(wb, `點名報告_${selectedDate}.xlsx`);
+  showToast('報告已匯出');
+}
+
+// ==================== TOAST ====================
+function showToast(msg, isError = false) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.className = isError ? 'toast error' : 'toast';
+  toast.style.display = 'block';
+  setTimeout(() => { toast.style.display = 'none'; }, 3000);
+}
+
+// ==================== START ====================
+init();
+</script>
+</body>
+</html>
