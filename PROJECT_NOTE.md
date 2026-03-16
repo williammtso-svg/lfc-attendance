@@ -6,9 +6,12 @@
 - **Apps Script**: `AppsScript_Code.js` (Google Sheets backend for saving records)
 
 ## Live Site
-- **URL**: https://lfc-attendance.netlify.app
-- **Netlify Site ID**: `f497ed0e-c49b-41eb-8b0e-c80737e4295c`
-- **Deploy Command**: `npx netlify-cli deploy --dir="/Users/williamso/Documents/attendance" --prod --site f497ed0e-c49b-41eb-8b0e-c80737e4295c`
+- **GitHub Pages URL**: https://williammtso-svg.github.io/lfc-attendance/
+- ~~Netlify Site ID~~: (credits exhausted - switched to GitHub Pages)
+
+## Deployment
+- **Platform**: GitHub Pages (free hosting)
+- **Auto-deploy**: Enabled on push to main branch
 
 ## Student Data Structure
 - Student list is stored in `index.html` as a JS object: `const TUTOR_DATA = { ... };`
