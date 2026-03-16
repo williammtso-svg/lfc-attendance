@@ -2012,7 +2012,7 @@ async function exportMonthCSV() {
   
   // Auto-styling for data rows
   let currentRow = 4;
-  Object.keys(groupedByClass).sort().forEach(() => {
+  Object.keys(groupedByClass).sort().forEach((classPrefix) => {
     currentRow++; // skip empty row
     groupedByClass[classPrefix].forEach((student, idx) => {
       const rowBg = idx % 2 === 0 ? 'FFFFFF' : 'F5F5F5';
