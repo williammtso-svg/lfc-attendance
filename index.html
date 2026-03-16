@@ -1840,6 +1840,8 @@ function exportSingleDateCSV() {
 }
 
 async function exportMonthCSV() {
+  try {
+  alert('Export started for month: ' + document.getElementById('filter-month').value);
   showToast('正在匯出月份報告...');
   const selectedMonth = document.getElementById('filter-month').value;
   console.log('Exporting month:', selectedMonth);
