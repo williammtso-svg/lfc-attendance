@@ -1840,7 +1840,9 @@ function exportSingleDateCSV() {
 }
 
 async function exportMonthCSV() {
+  showToast('正在匯出月份報告...');
   const selectedMonth = document.getElementById('filter-month').value;
+  console.log('Exporting month:', selectedMonth);
   const monthDates = CLASS_DATES.filter(d => d.startsWith(selectedMonth));
   
   if (!monthDates.length) {
@@ -1851,9 +1853,21 @@ async function exportMonthCSV() {
   // Fetch all records for this month
   const allRecords = [];
   for (const date of monthDates) {
-    await fetchRecords(date);
-    const records = getRecords();
-    allRecords.push(...records.filter(r => r.date === date));
+    try {
+      await fetchRecords(date);
+      const records = getRecords();
+      console.log('Fetched records for', date, ':', records);
+      allRecords.push(...records.filter(r => r.date === date));
+    } catch (err) {
+      console.error('Failed to fetch records for date:', date, err);
+    }
+  }
+  
+  console.log('All records collected:', allRecords);
+  
+  if (allRecords.length === 0) {
+    showToast('該月份沒有點名記錄', true);
+    return;
   }
   
   const tutorNames = Object.keys(TUTOR_DATA);
