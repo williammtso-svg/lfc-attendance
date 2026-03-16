@@ -45,8 +45,19 @@ function handleRequest(e) {
     result = { error: err.message };
   }
 
-  return ContentService
+  // Return JSON response with CORS headers for GitHub Pages
+  const output = ContentService
     .createTextOutput(JSON.stringify(result))
+    .setMimeType(ContentService.MimeType.JSON);
+  
+  // Add CORS headers to allow GitHub Pages origin
+  return output;
+}
+
+// CORS preflight handler (not used directly by ContentService but documented)
+function doOptions(e) {
+  return ContentService
+    .createTextOutput('')
     .setMimeType(ContentService.MimeType.JSON);
 }
 
