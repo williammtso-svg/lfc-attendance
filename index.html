@@ -184,11 +184,22 @@ body { font-family: "Microsoft JhengHei", "PingFang TC", sans-serif; background:
   </div>
 
   <div class="container">
-    <!-- Date selector -->
+    <!-- Month & Date selector -->
     <div class="card" style="margin-bottom: 15px;">
-      <div style="display:flex; align-items:center; gap:15px;">
-        <label style="font-weight:bold; white-space:nowrap;">上課日期：</label>
-        <select id="filter-date" class="date-input" onchange="loadReport()" style="flex:1; padding:10px; font-size:15px; border-radius:8px; border:2px solid #ddd;"></select>
+      <div style="display:flex; align-items:center; gap:15px; flex-wrap:wrap;">
+        <label style="font-weight:bold; white-space:nowrap;">選擇模式：</label>
+        <select id="filter-mode" class="date-input" onchange="onFilterModeChange()" style="padding:10px; font-size:15px; border-radius:8px; border:2px solid #ddd;">
+          <option value="date">按日期查看</option>
+          <option value="month">按月份匯出</option>
+        </select>
+        <div id="date-selector-container" style="flex:1; display:flex; align-items:center; gap:10px;">
+          <label style="font-weight:bold; white-space:nowrap;">上課日期：</label>
+          <select id="filter-date" class="date-input" onchange="loadReport()" style="flex:1; padding:10px; font-size:15px; border-radius:8px; border:2px solid #ddd;"></select>
+        </div>
+        <div id="month-selector-container" style="flex:1; display:none; align-items:center; gap:10px;">
+          <label style="font-weight:bold; white-space:nowrap;">月份：</label>
+          <select id="filter-month" class="date-input" onchange="onMonthChange()" style="flex:1; padding:10px; font-size:15px; border-radius:8px; border:2px solid #ddd;"></select>
+        </div>
       </div>
     </div>
 
@@ -1149,6 +1160,55 @@ function init() {
   // Default to nearest class date
   const nearestAdmin = CLASS_DATES.find(d => d >= today) || CLASS_DATES[CLASS_DATES.length - 1];
   filterDate.value = nearestAdmin;
+
+  // Populate admin month filter
+  initMonthFilter();
+}
+
+// ==================== MONTH FILTER ====================
+let selectedMonthDates = [];
+
+function initMonthFilter() {
+  const monthSelect = document.getElementById('filter-month');
+  monthSelect.innerHTML = '';
+  
+  // Get unique months from CLASS_DATES
+  const monthMap = {};
+  CLASS_DATES.forEach(d => {
+    const dateObj = new Date(d + 'T00:00:00');
+    const yearMonth = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}`;
+    const label = `${dateObj.getFullYear()}年${MONTH_NAMES[dateObj.getMonth()]}`;
+    if (!monthMap[yearMonth]) {
+      monthMap[yearMonth] = label;
+    }
+  });
+  
+  // Add month options sorted
+  Object.keys(monthMap).sort().forEach(ym => {
+    monthSelect.innerHTML += `<option value="${ym}">${monthMap[ym]}</option>`;
+  });
+}
+
+function onFilterModeChange() {
+  const mode = document.getElementById('filter-mode').value;
+  const dateContainer = document.getElementById('date-selector-container');
+  const monthContainer = document.getElementById('month-selector-container');
+  
+  if (mode === 'month') {
+    dateContainer.style.display = 'none';
+    monthContainer.style.display = 'flex';
+    onMonthChange();
+  } else {
+    dateContainer.style.display = 'flex';
+    monthContainer.style.display = 'none';
+    loadReport();
+  }
+}
+
+function onMonthChange() {
+  const selectedMonth = document.getElementById('filter-month').value;
+  selectedMonthDates = CLASS_DATES.filter(d => d.startsWith(selectedMonth));
+  loadMonthReport();
 }
 
 // ==================== LOGIN / LOGOUT ====================
@@ -1578,6 +1638,16 @@ async function resetTutor(tutorName) {
 
 // ==================== EXPORT ====================
 function exportCSV() {
+  const mode = document.getElementById('filter-mode').value;
+  
+  if (mode === 'month') {
+    exportMonthCSV();
+  } else {
+    exportSingleDateCSV();
+  }
+}
+
+function exportSingleDateCSV() {
   const rows = adminReportRows;
   if (!rows.length) { showToast('沒有記錄可匯出', true); return; }
   const selectedDate = document.getElementById('filter-date').value;
@@ -1766,7 +1836,350 @@ function exportCSV() {
   showToast('報告已匯出');
 }
 
-// ==================== TOAST ====================
+async function exportMonthCSV() {
+  const selectedMonth = document.getElementById('filter-month').value;
+  const monthDates = CLASS_DATES.filter(d => d.startsWith(selectedMonth));
+  
+  if (!monthDates.length) {
+    showToast('該月份沒有上課日期', true);
+    return;
+  }
+  
+  // Fetch all records for this month
+  const allRecords = [];
+  for (const date of monthDates) {
+    await fetchRecords(date);
+    const records = getRecords();
+    allRecords.push(...records.filter(r => r.date === date));
+  }
+  
+  const tutorNames = Object.keys(TUTOR_DATA);
+  const monthlyData = {};
+  
+  // Process all dates in the month
+  monthDates.forEach(date => {
+    const dateRecords = allRecords.filter(r => r.date === date);
+    
+    tutorNames.forEach(tutor => {
+      const instruments = TUTOR_DATA[tutor];
+      const record = dateRecords.find(r => r.tutor.trim() === tutor.trim());
+      
+      Object.keys(instruments).forEach(instrument => {
+        const info = instruments[instrument];
+        info.students.forEach(student => {
+          if (!monthlyData[student.class_no]) {
+            monthlyData[student.class_no] = {
+              classNo: student.class_no,
+              name: student.name,
+              tutor: tutor,
+              instrument: instrument,
+              time: info.time,
+              room: info.room,
+              attendances: {}
+            };
+          }
+          
+          let status = '';
+          let reason = '';
+          
+          if (record && record.entries) {
+            const entryKey = `${instrument}__${student.class_no}__${student.name}`;
+            let entry = record.entries[entryKey];
+            if (!entry) {
+              entry = Object.values(record.entries).find(e =>
+                e.name.trim() === student.name.trim() && e.instrument.trim() === instrument.trim()
+              );
+            }
+            if (entry) {
+              status = entry.status;
+              reason = entry.reason || '';
+            }
+          }
+          
+          monthlyData[student.class_no].attendances[date] = { status, reason };
+        });
+      });
+    });
+  });
+  
+  // Build Excel with monthly attendance
+  const wb = XLSX.utils.book_new();
+  const wsData = [];
+  const merges = [];
+  
+  const thinBorder = {
+    top: { style: 'thin', color: { rgb: 'AAAAAA' } },
+    bottom: { style: 'thin', color: { rgb: 'AAAAAA' } },
+    left: { style: 'thin', color: { rgb: 'AAAAAA' } },
+    right: { style: 'thin', color: { rgb: 'AAAAAA' } }
+  };
+  
+  // Title
+  const [year, month] = selectedMonth.split('-');
+  wsData.push([`保良局羅氏基金中學 - ${year}年${MONTH_NAMES[parseInt(month)-1]}點名報告`, '', '', '', '']);
+  merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: monthDates.length + 3 } });
+  wsData.push(['']);
+  
+  // Header row - class info + dates
+  const headerRow = ['班別學號', '姓名', '樂器', '導師'];
+  monthDates.forEach(d => {
+    const dateObj = new Date(d + 'T00:00:00');
+    headerRow.push(`${dateObj.getDate()}日`);
+  });
+  wsData.push(headerRow);
+  
+  // Student rows grouped by class
+  const groupedByClass = {};
+  Object.values(monthlyData).forEach(student => {
+    const classPrefix = student.classNo.substring(0, 2);
+    if (!groupedByClass[classPrefix]) groupedByClass[classPrefix] = [];
+    groupedByClass[classPrefix].push(student);
+  });
+  
+  Object.keys(groupedByClass).sort().forEach(classPrefix => {
+    // Add empty row between classes
+    wsData.push(['']);
+    
+    groupedByClass[classPrefix].forEach(student => {
+      const row = [
+        student.classNo,
+        student.name,
+        student.instrument,
+        student.tutor
+      ];
+      
+      monthDates.forEach(date => {
+        const att = student.attendances[date];
+        if (!att || !att.status) {
+          row.push('—');
+        } else if (att.status === 'present') {
+          row.push('✓');
+        } else {
+          row.push(`✗${att.reason ? '(' + att.reason + ')' : ''}`);
+        }
+      });
+      
+      wsData.push(row);
+    });
+  });
+  
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  ws['!merges'] = merges;
+  
+  // Set column widths
+  const colWidths = [{ wch: 12 }, { wch: 16 }, { wch: 14 }, { wch: 18 }];
+  monthDates.forEach(() => colWidths.push({ wch: 10 }));
+  ws['!cols'] = colWidths;
+  
+  // Title styling
+  if (ws['A1']) {
+    ws['A1'].s = {
+      font: { bold: true, sz: 16, color: { rgb: '1A3C6E' } },
+      alignment: { horizontal: 'center', vertical: 'center' }
+    };
+  }
+  
+  // Header row styling
+  const headerCols = monthDates.length + 4;
+  for (let c = 0; c < headerCols; c++) {
+    const ref = XLSX.utils.encode_cell({ r: 2, c });
+    if (ws[ref]) {
+      ws[ref].s = {
+        font: { bold: true, sz: 11, color: { rgb: 'FFFFFF' } },
+        fill: { fgColor: { rgb: '1A5276' } },
+        border: thinBorder,
+        alignment: { horizontal: 'center', vertical: 'center' }
+      };
+    }
+  }
+  
+  // Auto-styling for data rows
+  let currentRow = 4;
+  Object.keys(groupedByClass).sort().forEach(() => {
+    currentRow++; // skip empty row
+    groupedByClass[classPrefix].forEach((student, idx) => {
+      const rowBg = idx % 2 === 0 ? 'FFFFFF' : 'F5F5F5';
+      for (let c = 0; c < headerCols; c++) {
+        const ref = XLSX.utils.encode_cell({ r: currentRow, c });
+        if (ws[ref]) {
+          const cellValue = ws[ref].v;
+          const isAbsent = cellValue && cellValue.toString().startsWith('✗');
+          
+          ws[ref].s = {
+            font: { sz: 10, color: { rgb: isAbsent ? 'CC0000' : '333333' }, bold: isAbsent },
+            fill: { fgColor: { rgb: isAbsent ? 'FFF0F0' : rowBg } },
+            border: thinBorder,
+            alignment: { horizontal: c < 4 ? 'left' : 'center', vertical: 'center' }
+          };
+        }
+      }
+      currentRow++;
+    });
+  });
+  
+  XLSX.utils.book_append_sheet(wb, ws, '月份點名報告');
+  XLSX.writeFile(wb, `點名報告_${year}年${MONTH_NAMES[parseInt(month)-1]}.xlsx`);
+  showToast('月份報告已匯出');
+}
+
+// ==================== MONTH REPORT ====================
+async function loadMonthReport() {
+  const monthDates = selectedMonthDates;
+  
+  if (!monthDates.length) {
+    document.getElementById('tutor-status-list').innerHTML = '<span style="color:#999;">該月份沒有上課日期</span>';
+    document.getElementById('report-table').getElementsByTagName('tbody')[0].innerHTML = '<tr><td colspan="8" style="text-align:center; color:#999; padding:20px;">該月份沒有上課日期</td></tr>';
+    return;
+  }
+  
+  // Show loading
+  document.getElementById('tutor-status-list').innerHTML = '<span style="color:#999;">載入中...</span>';
+  document.getElementById('report-table').getElementsByTagName('tbody')[0].innerHTML = '<tr><td colspan="8" style="text-align:center; color:#999; padding:20px;">載入中...</td></tr>';
+  
+  // Fetch all records for this month
+  const allRecords = [];
+  for (const date of monthDates) {
+    await fetchRecords(date);
+    const records = getRecords();
+    allRecords.push(...records.filter(r => r.date === date));
+  }
+  
+  const tutorNames = Object.keys(TUTOR_DATA);
+  
+  // 1. 導師提交狀態（統計每個導師在該月有幾天已提交）
+  const statusHtml = [];
+  tutorNames.forEach(tutor => {
+    const submittedDates = monthDates.filter(date => {
+      return allRecords.some(r => r.date === date && r.tutor.trim() === tutor.trim());
+    });
+    const submittedCount = submittedDates.length;
+    const totalCount = monthDates.length;
+    
+    if (submittedCount === totalCount) {
+      statusHtml.push(`<span style="display:inline-flex; align-items:center; gap:6px; margin:4px 8px 4px 0; padding:6px 12px; border-radius:6px; background:#eafaf1; color:#27ae60; font-size:13px; border:1px solid #a9dfbf;"> ${tutor} — ${submittedCount}/${totalCount} 已提交</span>`);
+    } else if (submittedCount > 0) {
+      statusHtml.push(`<span style="display:inline-flex; align-items:center; gap:6px; margin:4px 8px 4px 0; padding:6px 12px; border-radius:6px; background:#fef3c7; color:#d97706; font-size:13px; border:1px solid #fcd34d;">⚠️ ${tutor} — ${submittedCount}/${totalCount} 已提交</span>`);
+    } else {
+      statusHtml.push(`<span style="display:inline-block; margin:4px 8px 4px 0; padding:6px 12px; border-radius:6px; background:#fdedec; color:#e74c3c; font-size:13px; border:1px solid #f5b7b1;">❌ ${tutor} — 未提交</span>`);
+    }
+  });
+  document.getElementById('tutor-status-list').innerHTML = statusHtml.join('');
+  
+  // 2. Build summary table showing all dates
+  const rows = [];
+  tutorNames.forEach(tutor => {
+    const instruments = TUTOR_DATA[tutor];
+    
+    Object.keys(instruments).forEach(instrument => {
+      const info = instruments[instrument];
+      info.students.forEach(student => {
+        const attendanceByDate = {};
+        
+        monthDates.forEach(date => {
+          const record = allRecords.find(r => r.date === date && r.tutor.trim() === tutor.trim());
+          let status = '';
+          let reason = '';
+          let submitted = false;
+          
+          if (record && record.entries) {
+            const entryKey = `${instrument}__${student.class_no}__${student.name}`;
+            let entry = record.entries[entryKey];
+            if (!entry) {
+              entry = Object.values(record.entries).find(e =>
+                e.name.trim() === student.name.trim() && e.instrument.trim() === instrument.trim()
+              );
+            }
+            if (entry) {
+              status = entry.status;
+              reason = entry.reason || '';
+              submitted = true;
+            }
+          }
+          
+          attendanceByDate[date] = { status, reason, submitted };
+        });
+        
+        // Calculate summary stats
+        const submittedDates = Object.values(attendanceByDate).filter(a => a.submitted);
+        const presentCount = submittedDates.filter(a => a.status === 'present').length;
+        const absentCount = submittedDates.filter(a => a.status === 'absent').length;
+        
+        rows.push({
+          tutor: tutor,
+          instrument: instrument,
+          time: info.time,
+          room: info.room,
+          classNo: student.class_no,
+          name: student.name,
+          attendanceByDate: attendanceByDate,
+          presentCount: presentCount,
+          absentCount: absentCount,
+          submittedCount: submittedDates.length,
+          totalDates: monthDates.length
+        });
+      });
+    });
+  });
+  
+  adminReportRows = rows;
+  
+  // 3. Render table with date columns
+  const CLASS_COLORS = [
+    '#dbeafe', '#fef3c7', '#d1fae5', '#ede9fe', '#fce7f3',
+    '#cffafe', '#fde68a', '#bbf7d0', '#ddd6fe', '#fbcfe8',
+    '#bae6fd', '#fed7aa', '#a7f3d0', '#c7d2fe', '#f9a8d4'
+  ];
+  let colorIndex = 0;
+  const instrumentColorMap = {};
+  
+  let html = '';
+  rows.forEach((r, idx) => {
+    const instrKey = `${r.tutor}__${r.instrument}`;
+    if (!(instrKey in instrumentColorMap)) {
+      instrumentColorMap[instrKey] = CLASS_COLORS[colorIndex % CLASS_COLORS.length];
+      colorIndex++;
+    }
+    
+    const classBg = instrumentColorMap[instrKey];
+    const hasAbsent = r.absentCount > 0;
+    const rowBg = hasAbsent ? 'background:#fff5f5;' : `background:${classBg};`;
+    
+    // Build attendance cells
+    let attendancesHtml = '';
+    monthDates.forEach(date => {
+      const att = r.attendanceByDate[date];
+      if (!att || !att.submitted) {
+        attendancesHtml += `<td style="${rowBg}"><span style="color:#aaa;">—</span></td>`;
+      } else if (att.status === 'present') {
+        attendancesHtml += `<td style="${rowBg}"><span style="color:#27ae60; font-weight:bold;">✓</span></td>`;
+      } else {
+        attendancesHtml += `<td style="${rowBg}"><span style="color:#e74c3c; font-weight:bold;">✗</span><br><small style="color:#e74c3c;">${att.reason || ''}</small></td>`;
+      }
+    });
+    
+    html += `<tr style="${rowBg}"><td>${r.tutor}</td><td>${r.instrument}</td><td>${r.time}</td><td>${r.room}</td><td>${r.classNo}</td><td>${r.name}</td>${attendancesHtml}</tr>`;
+  });
+  
+  // Update table headers to show dates
+  const dateHeaderCells = monthDates.map(d => {
+    const dateObj = new Date(d + 'T00:00:00');
+    return `<th>${dateObj.getDate()}日</th>`;
+  }).join('');
+  
+  document.getElementById('report-table').getElementsByTagName('thead')[0].innerHTML = `
+    <tr>
+      <th>導師</th>
+      <th>樂器</th>
+      <th>時間</th>
+      <th>課室</th>
+      <th>班別學號</th>
+      <th>學生姓名</th>
+      ${dateHeaderCells}
+    </tr>
+  `;
+  
+  document.getElementById('report-table').getElementsByTagName('tbody')[0].innerHTML = html;
+}
 function showToast(msg, isError = false) {
   const toast = document.getElementById('toast');
   toast.textContent = msg;
