@@ -1937,10 +1937,9 @@ async function exportMonthCSV() {
   const [year, month] = selectedMonth.split('-');
   wsData.push([`保良局羅氏基金中學 - ${year}年${MONTH_NAMES[parseInt(month)-1]}點名報告`, '', '', '', '']);
   merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: monthDates.length + 3 } });
-  wsData.push(['']);
   
   // Header row - class info + dates
-  const headerRow = ['班別學號', '姓名', '樂器', '導師'];
+  const headerRow = ['姓名', '樂器', '課堂時間', '課室', '班別學號'];
   monthDates.forEach(d => {
     const dateObj = new Date(d + 'T00:00:00');
     headerRow.push(`${dateObj.getDate()}日`);
@@ -1986,7 +1985,7 @@ async function exportMonthCSV() {
   ws['!merges'] = merges;
   
   // Set column widths
-  const colWidths = [{ wch: 12 }, { wch: 16 }, { wch: 14 }, { wch: 18 }];
+  const colWidths = [{ wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 8 }, { wch: 12 }];
   monthDates.forEach(() => colWidths.push({ wch: 10 }));
   ws['!cols'] = colWidths;
   
@@ -1999,7 +1998,7 @@ async function exportMonthCSV() {
   }
   
   // Header row styling
-  const headerCols = monthDates.length + 4;
+  const headerCols = monthDates.length + 5;
   for (let c = 0; c < headerCols; c++) {
     const ref = XLSX.utils.encode_cell({ r: 2, c });
     if (ws[ref]) {
@@ -2012,28 +2011,42 @@ async function exportMonthCSV() {
     }
   }
   
-  // Auto-styling for data rows
-  let currentRow = 4;
-  Object.keys(groupedByClass).sort().forEach((classPrefix) => {
-    currentRow++; // skip empty row
-    groupedByClass[classPrefix].forEach((student, idx) => {
-      const rowBg = idx % 2 === 0 ? 'FFFFFF' : 'F5F5F5';
+  // Styling for data rows (skip instrument header rows)
+  let currentRow = 3; // start after header
+  wsData.forEach((rowData, idx) => {
+    const ref = XLSX.utils.encode_cell({ r: currentRow, c: 0 });
+    if (ws[ref] && rowData.length === 1) {
+      // Instrument header row
+      for (let c = 0; c < headerCols; c++) {
+        const ref = XLSX.utils.encode_cell({ r: currentRow, c });
+        if (ws[ref]) {
+          ws[ref].s = {
+            font: { bold: true, sz: 12, color: { rgb: '1A5276' } },
+            fill: { fgColor: { rgb: 'E8F4FD' } },
+            border: thinBorder,
+            alignment: { horizontal: 'left', vertical: 'center' }
+          };
+        }
+      }
+    } else if (rowData.length > 1) {
+      // Data row - apply alternating colors
+      const isAbsent = rowData.slice(5).some(v => v && v.toString().startsWith('✗'));
       for (let c = 0; c < headerCols; c++) {
         const ref = XLSX.utils.encode_cell({ r: currentRow, c });
         if (ws[ref]) {
           const cellValue = ws[ref].v;
-          const isAbsent = cellValue && cellValue.toString().startsWith('✗');
+          const cellIsAbsent = cellValue && cellValue.toString().startsWith('✗');
           
           ws[ref].s = {
-            font: { sz: 10, color: { rgb: isAbsent ? 'CC0000' : '333333' }, bold: isAbsent },
-            fill: { fgColor: { rgb: isAbsent ? 'FFF0F0' : rowBg } },
+            font: { sz: 10, color: { rgb: cellIsAbsent ? 'CC0000' : '333333' }, bold: cellIsAbsent },
+            fill: { fgColor: { rgb: cellIsAbsent ? 'FFF0F0' : 'FFFFFF' } },
             border: thinBorder,
-            alignment: { horizontal: c < 4 ? 'left' : 'center', vertical: 'center' }
+            alignment: { horizontal: c < 5 ? 'left' : 'center', vertical: 'center' }
           };
         }
       }
-      currentRow++;
-    });
+    }
+    currentRow++;
   });
   
   XLSX.utils.book_append_sheet(wb, ws, '月份點名報告');
