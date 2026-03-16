@@ -213,7 +213,10 @@ body { font-family: "Microsoft JhengHei", "PingFang TC", sans-serif; background:
     <div class="card">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
         <h4>出席報告（全部學生）</h4>
-        <button class="btn btn-success" onclick="exportCSV()">匯出報告 (Excel)</button>
+        <div style="display: flex; gap: 10px;">
+          <button class="btn btn-success" onclick="exportMonthCSV()">匯出月份報告 (Excel)</button>
+          <button class="btn btn-secondary" onclick="exportCSV()">匯出單日報告 (Excel)</button>
+        </div>
       </div>
       <div class="report-table">
         <table id="report-table">
