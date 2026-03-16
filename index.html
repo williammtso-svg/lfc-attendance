@@ -2039,6 +2039,11 @@ async function exportMonthCSV() {
   XLSX.utils.book_append_sheet(wb, ws, '月份點名報告');
   XLSX.writeFile(wb, `點名報告_${year}年${MONTH_NAMES[parseInt(month)-1]}.xlsx`);
   showToast('月份報告已匯出');
+  } catch (err) {
+    console.error('Export error:', err);
+    alert('Export failed: ' + err.message);
+    showToast('匯出失敗: ' + err.message, true);
+  }
 }
 
 // ==================== MONTH REPORT ====================
