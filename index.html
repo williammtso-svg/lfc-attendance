@@ -1476,7 +1476,17 @@ async function loadReport() {
       statusHtml.push(`<span style="display:inline-block; margin:4px 8px 4px 0; padding:6px 12px; border-radius:6px; background:#fdedec; color:#e74c3c; font-size:13px; border:1px solid #f5b7b1;">❌ ${tutor} — 未提交</span>`);
     }
   });
-  document.getElementById('tutor-status-list').innerHTML = statusHtml.join('');
+  // Update the tutor status list to include both date summary and tutor summary
+  document.getElementById('tutor-status-list').innerHTML = `
+    <div style="margin-bottom:15px; padding:12px; background:#f8f9fa; border-radius:8px; border-left:4px solid #2980b9;">
+      <div style="font-weight:bold; color:#1a5276; margin-bottom:8px; font-size:14px;">📅 上課日提交狀態：</div>
+      <div style="display:flex; flex-wrap:wrap; gap:4px;">${dateStatusHtml.join('')}</div>
+    </div>
+    <div style="padding:12px; background:#f8f9fa; border-radius:8px; border-left:4px solid #27ae60;">
+      <div style="font-weight:bold; color:#1a5276; margin-bottom:8px; font-size:14px;">👨‍🏫 導師提交狀態：</div>
+      <div style="display:flex; flex-wrap:wrap; gap:4px;">${statusHtml.join('')}</div>
+    </div>
+  `;
 
   // 2. 完整學生名單
   const rows = [];
@@ -2104,6 +2114,31 @@ async function loadMonthReport() {
   
   const tutorNames = Object.keys(TUTOR_DATA);
   
+  // 0. 日期提交狀態摘要（顯示每個上課日有多少導師已提交）
+  const dateStatusHtml = [];
+  monthDates.forEach(date => {
+    const dateObj = new Date(date + 'T00:00:00');
+    const dateStr = `${dateObj.getMonth() + 1}月${dateObj.getDate()}日`;
+    const submittedTutors = new Set();
+    
+    allRecords.forEach(r => {
+      if (r.date === date) {
+        submittedTutors.add(r.tutor.trim());
+      }
+    });
+    
+    const submittedCount = submittedTutors.size;
+    const totalTutors = tutorNames.length;
+    
+    if (submittedCount === totalTutors) {
+      dateStatusHtml.push(`<span style="display:inline-flex; align-items:center; gap:4px; margin:4px 8px 4px 0; padding:4px 10px; border-radius:4px; background:#eafaf1; color:#27ae60; font-size:12px; border:1px solid #a9dfbf;">${dateStr} ✓ ${submittedCount}/${totalTutors}</span>`);
+    } else if (submittedCount > 0) {
+      dateStatusHtml.push(`<span style="display:inline-flex; align-items:center; gap:4px; margin:4px 8px 4px 0; padding:4px 10px; border-radius:4px; background:#fef3c7; color:#d97706; font-size:12px; border:1px solid #fcd34d;">${dateStr} ⚠️ ${submittedCount}/${totalTutors}</span>`);
+    } else {
+      dateStatusHtml.push(`<span style="display:inline-flex; align-items:center; gap:4px; margin:4px 8px 4px 0; padding:4px 10px; border-radius:4px; background:#fdedec; color:#e74c3c; font-size:12px; border:1px solid #f5b7b1; font-weight:bold;">${dateStr} ❌ 未點名</span>`);
+    }
+  });
+  
   // 1. 導師提交狀態（統計每個導師在該月有幾天已提交）
   const statusHtml = [];
   tutorNames.forEach(tutor => {
@@ -2207,7 +2242,7 @@ async function loadMonthReport() {
     monthDates.forEach(date => {
       const att = r.attendanceByDate[date];
       if (!att || !att.submitted) {
-        attendancesHtml += `<td style="${rowBg}"><span style="color:#aaa;">—</span></td>`;
+        attendancesHtml += `<td style="${rowBg}"><span style="color:#e74c3c; font-weight:bold; font-size:11px;">未點名</span></td>`;
       } else if (att.status === 'present') {
         attendancesHtml += `<td style="${rowBg}"><span style="color:#27ae60; font-weight:bold;">✓</span></td>`;
       } else {
