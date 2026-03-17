@@ -1462,6 +1462,7 @@ async function loadReport() {
   document.getElementById('tutor-status-list').innerHTML = '<span style="color:#999;">載入中...</span>';
   document.getElementById('report-table').getElementsByTagName('tbody')[0].innerHTML = '<tr><td colspan="8" style="text-align:center; color:#999; padding:20px;">載入中...</td></tr>';
 
+  try {
   await fetchRecords(selectedDate);
   const records = getRecords();
   const tutorNames = Object.keys(TUTOR_DATA);
@@ -1578,6 +1579,12 @@ async function loadReport() {
   });
 
   document.getElementById('report-table').getElementsByTagName('tbody')[0].innerHTML = html;
+  } catch (err) {
+    console.error('loadReport error:', err);
+    document.getElementById('tutor-status-list').innerHTML = '<span style="color:#e74c3c;">載入失敗：' + err.message + '</span>';
+    document.getElementById('report-table').getElementsByTagName('tbody')[0].innerHTML = '<tr><td colspan="8" style="text-align:center; color:#e74c3c; padding:20px;">載入失敗：' + err.message + '</td></tr>';
+    showToast('載入失敗: ' + err.message, true);
+  }
 }
 
 
