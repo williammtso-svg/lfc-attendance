@@ -2104,6 +2104,7 @@ async function loadMonthReport() {
   document.getElementById('tutor-status-list').innerHTML = '<span style="color:#999;">載入中...</span>';
   document.getElementById('report-table').getElementsByTagName('tbody')[0].innerHTML = '<tr><td colspan="8" style="text-align:center; color:#999; padding:20px;">載入中...</td></tr>';
   
+  try {
   // Fetch all records for this month
   const allRecords = [];
   for (const date of monthDates) {
@@ -2272,6 +2273,12 @@ async function loadMonthReport() {
   `;
   
   document.getElementById('report-table').getElementsByTagName('tbody')[0].innerHTML = html;
+  } catch (err) {
+    console.error('loadMonthReport error:', err);
+    document.getElementById('tutor-status-list').innerHTML = '<span style="color:#e74c3c;">載入失敗：' + err.message + '</span>';
+    document.getElementById('report-table').getElementsByTagName('tbody')[0].innerHTML = '<tr><td colspan="8" style="text-align:center; color:#e74c3c; padding:20px;">載入失敗，請刷新頁面重試</td></tr>';
+    showToast('載入失敗: ' + err.message, true);
+  }
 }
 function showToast(msg, isError = false) {
   const toast = document.getElementById('toast');
