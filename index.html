@@ -1869,220 +1869,265 @@ function exportSingleDateCSV() {
 
 async function exportMonthCSV() {
   try {
-  alert('Export started for month: ' + document.getElementById('filter-month').value);
-  showToast('正在匯出月份報告...');
-  const selectedMonth = document.getElementById('filter-month').value;
-  console.log('Exporting month:', selectedMonth);
-  const monthDates = CLASS_DATES.filter(d => d.startsWith(selectedMonth));
-  
-  if (!monthDates.length) {
-    showToast('該月份沒有上課日期', true);
-    return;
-  }
-  
-  // Fetch all records for this month
-  const allRecords = [];
-  for (const date of monthDates) {
-    try {
-      await fetchRecords(date);
-      const records = getRecords();
-      console.log('Fetched records for', date, ':', records);
-      allRecords.push(...records.filter(r => r.date === date));
-    } catch (err) {
-      console.error('Failed to fetch records for date:', date, err);
-    }
-  }
-  
-  console.log('All records collected:', allRecords);
-  
-  if (allRecords.length === 0) {
-    showToast('該月份沒有點名記錄', true);
-    return;
-  }
-  
-  const tutorNames = Object.keys(TUTOR_DATA);
-  const monthlyData = {};
-  
-  // Process all dates in the month
-  monthDates.forEach(date => {
-    const dateRecords = allRecords.filter(r => r.date === date);
+    showToast('正在匯出月份報告...');
+    const selectedMonth = document.getElementById('filter-month').value;
+    const monthDates = CLASS_DATES.filter(d => d.startsWith(selectedMonth));
     
-    tutorNames.forEach(tutor => {
-      const instruments = TUTOR_DATA[tutor];
-      const record = dateRecords.find(r => r.tutor.trim() === tutor.trim());
+    if (!monthDates.length) {
+      showToast('該月份沒有上課日期', true);
+      return;
+    }
+    
+    // Fetch all records for this month
+    const allRecords = [];
+    for (const date of monthDates) {
+      try {
+        await fetchRecords(date);
+        const records = getRecords();
+        allRecords.push(...records.filter(r => r.date === date));
+      } catch (err) {
+        console.error('Failed to fetch records for date:', date, err);
+      }
+    }
+    
+    // Build rows for all dates combined
+    const allRows = [];
+    monthDates.forEach(date => {
+      const dateRecords = allRecords.filter(r => r.date === date);
+      const tutorNames = Object.keys(TUTOR_DATA);
       
-      Object.keys(instruments).forEach(instrument => {
-        const info = instruments[instrument];
-        info.students.forEach(student => {
-          if (!monthlyData[student.class_no]) {
-            monthlyData[student.class_no] = {
-              classNo: student.class_no,
-              name: student.name,
+      tutorNames.forEach(tutor => {
+        const instruments = TUTOR_DATA[tutor];
+        const record = dateRecords.find(r => r.tutor.trim() === tutor.trim());
+        
+        Object.keys(instruments).forEach(instrument => {
+          const info = instruments[instrument];
+          info.students.forEach(student => {
+            let status = '';
+            let reason = '';
+            let submitted = false;
+            
+            if (record && record.entries) {
+              const entryKey = `${instrument}__${student.class_no}__${student.name}`;
+              let entry = record.entries[entryKey];
+              if (!entry) {
+                entry = Object.values(record.entries).find(e =>
+                  e.name.trim() === student.name.trim() && e.classNo.trim() === student.class_no.trim()
+                );
+              }
+              if (entry) {
+                status = entry.status;
+                reason = entry.reason || '';
+                submitted = true;
+              }
+            }
+            
+            allRows.push({
+              date: date,
               tutor: tutor,
               instrument: instrument,
               time: info.time,
               room: info.room,
-              attendances: {}
-            };
-          }
-          
-          let status = '';
-          let reason = '';
-          
-          if (record && record.entries) {
-            const entryKey = `${instrument}__${student.class_no}__${student.name}`;
-            let entry = record.entries[entryKey];
-            if (!entry) {
-              entry = Object.values(record.entries).find(e =>
-                e.name.trim() === student.name.trim() && e.instrument.trim() === instrument.trim()
-              );
-            }
-            if (entry) {
-              status = entry.status;
-              reason = entry.reason || '';
-            }
-          }
-          
-          monthlyData[student.class_no].attendances[date] = { status, reason };
+              classNo: student.class_no,
+              name: student.name,
+              status: status,
+              reason: reason,
+              submitted: submitted
+            });
+          });
         });
       });
     });
-  });
-  
-  // Build Excel with monthly attendance
-  const wb = XLSX.utils.book_new();
-  const wsData = [];
-  const merges = [];
-  
-  const thinBorder = {
-    top: { style: 'thin', color: { rgb: 'AAAAAA' } },
-    bottom: { style: 'thin', color: { rgb: 'AAAAAA' } },
-    left: { style: 'thin', color: { rgb: 'AAAAAA' } },
-    right: { style: 'thin', color: { rgb: 'AAAAAA' } }
-  };
-  
-  // Title
-  const [year, month] = selectedMonth.split('-');
-  wsData.push([`保良局羅氏基金中學 - ${year}年${MONTH_NAMES[parseInt(month)-1]}點名報告`, '', '', '', '']);
-  merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: monthDates.length + 3 } });
-  
-  // Header row - class info + dates
-  const headerRow = ['姓名', '樂器', '課堂時間', '課室', '班別學號'];
-  monthDates.forEach(d => {
-    const dateObj = new Date(d + 'T00:00:00');
-    headerRow.push(`${dateObj.getDate()}日`);
-  });
-  wsData.push(headerRow);
-  
-  // Student rows grouped by class
-  const groupedByClass = {};
-  Object.values(monthlyData).forEach(student => {
-    const classPrefix = student.classNo.substring(0, 2);
-    if (!groupedByClass[classPrefix]) groupedByClass[classPrefix] = [];
-    groupedByClass[classPrefix].push(student);
-  });
-  
-  Object.keys(groupedByClass).sort().forEach(classPrefix => {
-    // Add empty row between classes
-    wsData.push(['']);
     
-    groupedByClass[classPrefix].forEach(student => {
-      const row = [
-        student.classNo,
-        student.name,
-        student.instrument,
-        student.tutor
-      ];
+    if (allRows.length === 0) {
+      showToast('沒有學生記錄可匯出', true);
+      return;
+    }
+    
+    // Group by tutor + instrument + time + room (same as single day export)
+    const grouped = {};
+    allRows.forEach(r => {
+      const key = `${r.tutor}|||${r.instrument}|||${r.time}|||${r.room}`;
+      if (!grouped[key]) grouped[key] = [];
+      grouped[key].push(r);
+    });
+    
+    const wb = XLSX.utils.book_new();
+    const wsData = [];
+    const merges = [];
+    let currentRow = 0;
+    
+    const thinBorder = {
+      top: { style: 'thin', color: { rgb: 'AAAAAA' } },
+      bottom: { style: 'thin', color: { rgb: 'AAAAAA' } },
+      left: { style: 'thin', color: { rgb: 'AAAAAA' } },
+      right: { style: 'thin', color: { rgb: 'AAAAAA' } }
+    };
+    
+    const CLASS_BG = [
+      'DBEAFE', 'FEF3C7', 'D1FAE5', 'EDE9FE', 'FCE7F3',
+      'CFFAFE', 'FDE68A', 'BBF7D0', 'DDD6FE', 'FBCFE8',
+      'BAE6FD', 'FED7AA', 'A7F3D0', 'C7D2FE', 'F9A8D4'
+    ];
+    let colorIdx = 0;
+    
+    const [year, month] = selectedMonth.split('-');
+    
+    // Title
+    wsData.push([`保良局羅氏基金中學 - 樂器班月份點名報告`, '', '', '', '']);
+    merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: 4 } });
+    currentRow++;
+    
+    // Month
+    wsData.push([`月份：${year}年${MONTH_NAMES[parseInt(month)-1]}`, '', '', '', '']);
+    merges.push({ s: { r: 1, c: 0 }, e: { r: 1, c: 4 } });
+    currentRow++;
+    
+    // Empty row
+    wsData.push(['', '', '', '', '']);
+    currentRow++;
+    
+    // Summary
+    const totalStudents = new Set(allRows.map(r => r.classNo)).size;
+    const totalPresent = allRows.filter(r => r.submitted && r.status === 'present').length;
+    const totalAbsent = allRows.filter(r => r.submitted && r.status === 'absent').length;
+    const totalPending = allRows.filter(r => !r.submitted).length;
+    wsData.push([`總人次：${allRows.length}`, `出席：${totalPresent}`, `缺席：${totalAbsent}`, `導師未點名：${totalPending}`, '']);
+    currentRow++;
+    
+    // Empty row
+    wsData.push(['', '', '', '', '']);
+    currentRow++;
+    
+    // Group data by class
+    Object.entries(grouped).forEach(([key, students]) => {
+      const [tutor, instrument, time, room] = key.split('|||');
+      const bg = CLASS_BG[colorIdx % CLASS_BG.length];
+      colorIdx++;
       
-      monthDates.forEach(date => {
-        const att = student.attendances[date];
-        if (!att || !att.status) {
-          row.push('—');
-        } else if (att.status === 'present') {
-          row.push('✓');
+      // Class header
+      wsData.push([`${instrument} | 導師：${tutor} | ${time} | 課室：${room}`]);
+      merges.push({ s: { r: currentRow, c: 0 }, e: { r: currentRow, c: 4 } });
+      currentRow++;
+      
+      // Column headers
+      wsData.push(['班別學號', '學生姓名', '日期', '狀態', '缺席原因']);
+      currentRow++;
+      
+      // Student rows
+      students.forEach((r, idx) => {
+        let statusText = '';
+        if (!r.submitted) {
+          statusText = '⚠️ 導師未點名';
+        } else if (r.status === 'present') {
+          statusText = '✓ 出席';
         } else {
-          row.push(`✗${att.reason ? '(' + att.reason + ')' : ''}`);
+          statusText = '✗ 缺席';
         }
+        
+        const dateObj = new Date(r.date + 'T00:00:00');
+        const dateStr = `${dateObj.getMonth() + 1}/${dateObj.getDate()}`;
+        
+        wsData.push([r.classNo, r.name, dateStr, statusText, r.reason || '']);
+        currentRow++;
       });
       
-      wsData.push(row);
+      // Empty row between classes
+      wsData.push(['', '', '', '', '']);
+      currentRow++;
     });
-  });
-  
-  const ws = XLSX.utils.aoa_to_sheet(wsData);
-  ws['!merges'] = merges;
-  
-  // Set column widths
-  const colWidths = [{ wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 8 }, { wch: 12 }];
-  monthDates.forEach(() => colWidths.push({ wch: 10 }));
-  ws['!cols'] = colWidths;
-  
-  // Title styling
-  if (ws['A1']) {
-    ws['A1'].s = {
-      font: { bold: true, sz: 16, color: { rgb: '1A3C6E' } },
-      alignment: { horizontal: 'center', vertical: 'center' }
-    };
-  }
-  
-  // Header row styling
-  const headerCols = monthDates.length + 5;
-  for (let c = 0; c < headerCols; c++) {
-    const ref = XLSX.utils.encode_cell({ r: 2, c });
-    if (ws[ref]) {
-      ws[ref].s = {
-        font: { bold: true, sz: 11, color: { rgb: 'FFFFFF' } },
-        fill: { fgColor: { rgb: '1A5276' } },
-        border: thinBorder,
-        alignment: { horizontal: 'center', vertical: 'center' }
-      };
+    
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    ws['!merges'] = merges;
+    ws['!cols'] = [{ wch: 14 }, { wch: 12 }, { wch: 10 }, { wch: 14 }, { wch: 16 }];
+    
+    // Apply styling
+    let row = 0;
+    
+    // Title styling
+    for (let c = 0; c < 5; c++) {
+      const ref = XLSX.utils.encode_cell({ r: 0, c });
+      if (ws[ref]) {
+        ws[ref].s = {
+          font: { bold: true, sz: 16, color: { rgb: '1A3C6E' } },
+          alignment: { horizontal: 'center', vertical: 'center' }
+        };
+      }
     }
-  }
-  
-  // Styling for data rows (skip instrument header rows)
-  let currentRow = 3; // start after header
-  wsData.forEach((rowData, idx) => {
-    const ref = XLSX.utils.encode_cell({ r: currentRow, c: 0 });
-    if (ws[ref] && rowData.length === 1) {
-      // Instrument header row
-      for (let c = 0; c < headerCols; c++) {
-        const ref = XLSX.utils.encode_cell({ r: currentRow, c });
+    row = 3;
+    
+    // Class sections styling
+    colorIdx = 0;
+    Object.entries(grouped).forEach(([key, students]) => {
+      const bg = CLASS_BG[colorIdx % CLASS_BG.length];
+      colorIdx++;
+      
+      // Class header row
+      for (let c = 0; c < 5; c++) {
+        const ref = XLSX.utils.encode_cell({ r: row, c });
         if (ws[ref]) {
           ws[ref].s = {
-            font: { bold: true, sz: 12, color: { rgb: '1A5276' } },
-            fill: { fgColor: { rgb: 'E8F4FD' } },
-            border: thinBorder,
+            font: { bold: true, sz: 12, color: { rgb: '1A1A1A' } },
+            fill: { fgColor: { rgb: bg } },
+            border: {
+              top: { style: 'medium', color: { rgb: '333333' } },
+              bottom: { style: 'thin', color: { rgb: '999999' } },
+              left: { style: 'thin', color: { rgb: '999999' } },
+              right: { style: 'thin', color: { rgb: '999999' } }
+            },
             alignment: { horizontal: 'left', vertical: 'center' }
           };
         }
       }
-    } else if (rowData.length > 1) {
-      // Data row - apply alternating colors
-      const isAbsent = rowData.slice(5).some(v => v && v.toString().startsWith('✗'));
-      for (let c = 0; c < headerCols; c++) {
-        const ref = XLSX.utils.encode_cell({ r: currentRow, c });
+      row++;
+      
+      // Column header row
+      for (let c = 0; c < 5; c++) {
+        const ref = XLSX.utils.encode_cell({ r: row, c });
         if (ws[ref]) {
-          const cellValue = ws[ref].v;
-          const cellIsAbsent = cellValue && cellValue.toString().startsWith('✗');
-          
           ws[ref].s = {
-            font: { sz: 10, color: { rgb: cellIsAbsent ? 'CC0000' : '333333' }, bold: cellIsAbsent },
-            fill: { fgColor: { rgb: cellIsAbsent ? 'FFF0F0' : 'FFFFFF' } },
+            font: { bold: true, sz: 11, color: { rgb: 'FFFFFF' } },
+            fill: { fgColor: { rgb: '4472C4' } },
             border: thinBorder,
-            alignment: { horizontal: c < 5 ? 'left' : 'center', vertical: 'center' }
+            alignment: { horizontal: 'center', vertical: 'center' }
           };
         }
       }
-    }
-    currentRow++;
-  });
-  
-  XLSX.utils.book_append_sheet(wb, ws, '月份點名報告');
-  XLSX.writeFile(wb, `點名報告_${year}年${MONTH_NAMES[parseInt(month)-1]}.xlsx`);
-  showToast('月份報告已匯出');
+      row++;
+      
+      // Student rows
+      students.forEach((r, si) => {
+        const isAbsent = r.submitted && r.status === 'absent';
+        const isPending = !r.submitted;
+        const stripeBg = si % 2 === 0 ? 'FFFFFF' : 'F8F9FA';
+        
+        for (let c = 0; c < 5; c++) {
+          const ref = XLSX.utils.encode_cell({ r: row, c });
+          if (ws[ref]) {
+            ws[ref].s = {
+              font: {
+                sz: 11,
+                color: { rgb: isAbsent ? 'CC0000' : isPending ? '999999' : '333333' },
+                bold: isAbsent
+              },
+              fill: { fgColor: { rgb: isAbsent ? 'FFF0F0' : stripeBg } },
+              border: thinBorder,
+              alignment: { horizontal: c === 0 ? 'center' : (c === 2 || c === 3 ? 'center' : 'left'), vertical: 'center' }
+            };
+          }
+        }
+        row++;
+      });
+      
+      // Empty row
+      row++;
+    });
+    
+    XLSX.utils.book_append_sheet(wb, ws, '月份點名報告');
+    XLSX.writeFile(wb, `月份點名報告_${year}年${MONTH_NAMES[parseInt(month)-1]}.xlsx`);
+    showToast('月份報告已匯出');
   } catch (err) {
     console.error('Export error:', err);
-    alert('Export failed: ' + err.message);
     showToast('匯出失敗: ' + err.message, true);
   }
 }
@@ -2293,6 +2338,7 @@ function showToast(msg, isError = false) {
 
 // Export single day report as PDF
 async function exportDayPDF() {
+  try {
   const { jsPDF } = window.jspdf;
   
   showToast('正在生成 PDF 報告...');
@@ -2307,10 +2353,20 @@ async function exportDayPDF() {
   
   const doc = new jsPDF('p', 'mm', 'a4');
   
-  // Add Chinese font
-  doc.addFileToVFS('NotoSansTC-Regular.ttf', NotoSansTCRegular);
-  doc.addFont('NotoSansTC-Regular.ttf', 'NotoSansTC', 'normal');
-  doc.setFont('NotoSansTC');
+  // Add Chinese font if available
+  try {
+    if (typeof NotoSansTCRegular !== 'undefined') {
+      doc.addFileToVFS('NotoSansTC-Regular.ttf', NotoSansTCRegular);
+      doc.addFont('NotoSansTC-Regular.ttf', 'NotoSansTC', 'normal');
+      doc.setFont('NotoSansTC');
+    } else {
+      console.warn('Chinese font not loaded, using default font');
+      doc.setFont('helvetica');
+    }
+  } catch (fontErr) {
+    console.warn('Font loading error:', fontErr);
+    doc.setFont('helvetica');
+  }
   
   // Title
   doc.setFontSize(18);
@@ -2428,10 +2484,15 @@ async function exportDayPDF() {
   
   doc.save(`Attendance_Report_${selectedDate}.pdf`);
   showToast('PDF 報告已匯出');
+  } catch (err) {
+    console.error('PDF export error:', err);
+    showToast('PDF 匯出失敗: ' + err.message, true);
+  }
 }
 
 // Export monthly report as PDF
 async function exportMonthPDF() {
+  try {
   const { jsPDF } = window.jspdf;
   
   showToast('正在生成月份 PDF 報告...');
@@ -2460,10 +2521,20 @@ async function exportMonthPDF() {
   
   const doc = new jsPDF('p', 'mm', 'a4');
   
-  // Add Chinese font
-  doc.addFileToVFS('NotoSansTC-Regular.ttf', NotoSansTCRegular);
-  doc.addFont('NotoSansTC-Regular.ttf', 'NotoSansTC', 'normal');
-  doc.setFont('NotoSansTC');
+  // Add Chinese font if available
+  try {
+    if (typeof NotoSansTCRegular !== 'undefined') {
+      doc.addFileToVFS('NotoSansTC-Regular.ttf', NotoSansTCRegular);
+      doc.addFont('NotoSansTC-Regular.ttf', 'NotoSansTC', 'normal');
+      doc.setFont('NotoSansTC');
+    } else {
+      console.warn('Chinese font not loaded, using default font');
+      doc.setFont('helvetica');
+    }
+  } catch (fontErr) {
+    console.warn('Font loading error:', fontErr);
+    doc.setFont('helvetica');
+  }
   
   // Title Page
   doc.setFontSize(20);
@@ -2573,6 +2644,10 @@ async function exportMonthPDF() {
   
   doc.save(`Monthly_Report_${selectedMonth}.pdf`);
   showToast('月份 PDF 報告已匯出');
+  } catch (err) {
+    console.error('Month PDF export error:', err);
+    showToast('月份 PDF 匯出失敗: ' + err.message, true);
+  }
 }
 
 // Calculate statistics for monthly report
