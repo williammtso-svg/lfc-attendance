@@ -1554,7 +1554,7 @@ async function loadReport() {
     let statusCell, reasonCell;
 
     if (!r.submitted) {
-      statusCell = `<span style="color:#aaa; font-style:italic;">待提交</span>`;
+      statusCell = `<span style="color:#e74c3c; font-weight:bold;">導師未點名</span>`;
       reasonCell = `<span style="color:#aaa;">—</span>`;
     } else {
       const statusOptions = r.status === 'present'
@@ -1740,7 +1740,14 @@ function exportSingleDateCSV() {
 
     // Students
     students.forEach(r => {
-      const status = r.submitted ? (r.status === 'present' ? '✓ 出席' : '✗ 缺席') : '⏳ 未提交';
+      let status;
+      if (!r.submitted) {
+        status = '⚠️ 導師未點名';
+      } else if (r.status === 'present') {
+        status = '✓ 出席';
+      } else {
+        status = '✗ 缺席';
+      }
       wsData.push([r.classNo, r.name, status, r.reason || '']);
       currentRow++;
     });
@@ -2312,12 +2319,22 @@ async function exportDayPDF() {
     doc.text(`${instrument} | Tutor: ${tutor} | ${time} | Room: ${room} | ${classPresent}/${students.length}`, 12, startY + 5.5);
     
     // Table
-    const tableData = students.map(s => [
-      s.classNo,
-      s.name,
-      s.submitted ? (s.status === 'present' ? 'Present' : 'Absent') : 'Pending',
-      s.reason || ''
-    ]);
+    const tableData = students.map(s => {
+      let statusText;
+      if (!s.submitted) {
+        statusText = 'Not Marked';
+      } else if (s.status === 'present') {
+        statusText = 'Present';
+      } else {
+        statusText = 'Absent';
+      }
+      return [
+        s.classNo,
+        s.name,
+        statusText,
+        s.reason || ''
+      ];
+    });
     
     doc.autoTable({
       startY: startY + 10,
@@ -2336,8 +2353,13 @@ async function exportDayPDF() {
         if (data.section === 'body' && data.column.index === 2) {
           if (data.cell.raw === 'Present') {
             data.cell.styles.textColor = [39, 174, 96];
+            data.cell.styles.fontStyle = 'bold';
           } else if (data.cell.raw === 'Absent') {
             data.cell.styles.textColor = [231, 76, 60];
+            data.cell.styles.fontStyle = 'bold';
+          } else if (data.cell.raw === 'Not Marked') {
+            data.cell.styles.textColor = [231, 76, 60];
+            data.cell.styles.fontStyle = 'bold';
           } else {
             data.cell.styles.textColor = [149, 165, 166];
           }
