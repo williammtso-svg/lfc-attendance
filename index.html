@@ -8,6 +8,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf-fonts@1.0.0/dist/noto-sans-tc.base64.min.js"></script>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: "Microsoft JhengHei", "PingFang TC", sans-serif; background: #f0f2f5; color: #333; }
@@ -2267,19 +2268,26 @@ async function exportDayPDF() {
   
   const doc = new jsPDF('p', 'mm', 'a4');
   
+  // Add Chinese font
+  doc.addFileToVFS('NotoSansTC-Regular.ttf', NotoSansTCRegular);
+  doc.addFont('NotoSansTC-Regular.ttf', 'NotoSansTC', 'normal');
+  doc.setFont('NotoSansTC');
+  
   // Title
   doc.setFontSize(18);
   doc.setTextColor(26, 82, 118);
-  doc.text('Po Leung Kuk Laws Foundation College', 105, 15, { align: 'center' });
+  doc.text('保良局羅氏基金中學', 105, 15, { align: 'center' });
   
   doc.setFontSize(14);
-  doc.text('Music Class Attendance Report', 105, 22, { align: 'center' });
+  doc.text('樂器班點名報告', 105, 22, { align: 'center' });
   
   // Date
   doc.setFontSize(12);
   doc.setTextColor(68, 68, 68);
   const dateObj = new Date(selectedDate + 'T00:00:00');
-  doc.text(`Date: ${dateObj.getFullYear()}-${String(dateObj.getMonth()+1).padStart(2,'0')}-${String(dateObj.getDate()).padStart(2,'0')}`, 105, 30, { align: 'center' });
+  const month = dateObj.getMonth() + 1;
+  const day = dateObj.getDate();
+  doc.text(`日期：${dateObj.getFullYear()}年${month}月${day}日`, 105, 30, { align: 'center' });
   
   // Statistics
   const totalStudents = rows.length;
@@ -2289,7 +2297,7 @@ async function exportDayPDF() {
   
   doc.setFontSize(11);
   doc.setTextColor(0, 0, 0);
-  doc.text(`Total: ${totalStudents} | Present: ${presentCount} | Absent: ${absentCount} | Pending: ${pendingCount}`, 105, 38, { align: 'center' });
+  doc.text(`總人數：${totalStudents} | 出席：${presentCount} | 缺席：${absentCount} | 導師未點名：${pendingCount}`, 105, 38, { align: 'center' });
   
   // Group by class
   const grouped = {};
@@ -2316,17 +2324,17 @@ async function exportDayPDF() {
     doc.rect(10, startY, 190, 8, 'F');
     doc.setFontSize(10);
     doc.setTextColor(26, 82, 118);
-    doc.text(`${instrument} | Tutor: ${tutor} | ${time} | Room: ${room} | ${classPresent}/${students.length}`, 12, startY + 5.5);
+    doc.text(`${instrument} | 導師：${tutor} | ${time} | 課室：${room} | 出席：${classPresent}/${students.length}`, 12, startY + 5.5);
     
     // Table
     const tableData = students.map(s => {
       let statusText;
       if (!s.submitted) {
-        statusText = 'Not Marked';
+        statusText = '導師未點名';
       } else if (s.status === 'present') {
-        statusText = 'Present';
+        statusText = '出席';
       } else {
-        statusText = 'Absent';
+        statusText = '缺席';
       }
       return [
         s.classNo,
@@ -2338,7 +2346,7 @@ async function exportDayPDF() {
     
     doc.autoTable({
       startY: startY + 10,
-      head: [['Class No.', 'Name', 'Status', 'Reason']],
+      head: [['班別學號', '學生姓名', '狀態', '缺席原因']],
       body: tableData,
       theme: 'grid',
       headStyles: { fillColor: [26, 82, 118], textColor: 255, fontSize: 9 },
@@ -2351,13 +2359,13 @@ async function exportDayPDF() {
       },
       didParseCell: function(data) {
         if (data.section === 'body' && data.column.index === 2) {
-          if (data.cell.raw === 'Present') {
+          if (data.cell.raw === '出席') {
             data.cell.styles.textColor = [39, 174, 96];
             data.cell.styles.fontStyle = 'bold';
-          } else if (data.cell.raw === 'Absent') {
+          } else if (data.cell.raw === '缺席') {
             data.cell.styles.textColor = [231, 76, 60];
             data.cell.styles.fontStyle = 'bold';
-          } else if (data.cell.raw === 'Not Marked') {
+          } else if (data.cell.raw === '導師未點名') {
             data.cell.styles.textColor = [231, 76, 60];
             data.cell.styles.fontStyle = 'bold';
           } else {
@@ -2376,7 +2384,7 @@ async function exportDayPDF() {
     doc.setPage(i);
     doc.setFontSize(8);
     doc.setTextColor(128, 128, 128);
-    doc.text(`Generated: ${new Date().toLocaleString()} | Page ${i} of ${pageCount}`, 105, 287, { align: 'center' });
+    doc.text(`生成時間：${new Date().toLocaleString('zh-TW')} | 第 ${i} 頁，共 ${pageCount} 頁`, 105, 287, { align: 'center' });
   }
   
   doc.save(`Attendance_Report_${selectedDate}.pdf`);
@@ -2413,10 +2421,15 @@ async function exportMonthPDF() {
   
   const doc = new jsPDF('p', 'mm', 'a4');
   
+  // Add Chinese font
+  doc.addFileToVFS('NotoSansTC-Regular.ttf', NotoSansTCRegular);
+  doc.addFont('NotoSansTC-Regular.ttf', 'NotoSansTC', 'normal');
+  doc.setFont('NotoSansTC');
+  
   // Title Page
   doc.setFontSize(20);
   doc.setTextColor(26, 82, 118);
-  doc.text('Monthly Attendance Report', 105, 30, { align: 'center' });
+  doc.text('月份出席報告', 105, 30, { align: 'center' });
   
   doc.setFontSize(14);
   doc.setTextColor(68, 68, 68);
@@ -2426,18 +2439,18 @@ async function exportMonthPDF() {
   // Summary Statistics
   doc.setFontSize(12);
   doc.setTextColor(0, 0, 0);
-  doc.text('Summary Statistics', 20, 60);
+  doc.text('統計摘要', 20, 60);
   
   doc.setFontSize(10);
-  doc.text(`Total Classes: ${stats.totalClasses}`, 20, 70);
-  doc.text(`Total Students: ${stats.totalStudents}`, 20, 77);
-  doc.text(`Average Attendance Rate: ${stats.avgAttendanceRate}%`, 20, 84);
-  doc.text(`Total Present: ${stats.totalPresent}`, 20, 91);
-  doc.text(`Total Absent: ${stats.totalAbsent}`, 20, 98);
+  doc.text(`總班級數：${stats.totalClasses}`, 20, 70);
+  doc.text(`總學生數：${stats.totalStudents}`, 20, 77);
+  doc.text(`平均出席率：${stats.avgAttendanceRate}%`, 20, 84);
+  doc.text(`總出席：${stats.totalPresent}`, 20, 91);
+  doc.text(`總缺席：${stats.totalAbsent}`, 20, 98);
   
   // Attendance by Class
   doc.setFontSize(12);
-  doc.text('Attendance by Class', 20, 115);
+  doc.text('各班出席率', 20, 115);
   
   const classStatsData = Object.entries(stats.byClass).map(([className, data]) => [
     className,
@@ -2449,7 +2462,7 @@ async function exportMonthPDF() {
   
   doc.autoTable({
     startY: 120,
-    head: [['Class', 'Total', 'Present', 'Absent', 'Rate']],
+    head: [['班級', '總人數', '出席', '缺席', '出席率']],
     body: classStatsData,
     theme: 'grid',
     headStyles: { fillColor: [26, 82, 118], textColor: 255 },
@@ -2461,7 +2474,7 @@ async function exportMonthPDF() {
     doc.addPage();
     doc.setFontSize(14);
     doc.setTextColor(26, 82, 118);
-    doc.text('Absence Analysis', 105, 20, { align: 'center' });
+    doc.text('缺席分析', 105, 20, { align: 'center' });
     
     const reasonData = Object.entries(stats.absenceReasons).map(([reason, count]) => [
       reason,
@@ -2503,7 +2516,7 @@ async function exportMonthPDF() {
   
   doc.autoTable({
     startY: 30,
-    head: [['Date', 'Present', 'Absent', 'Rate']],
+    head: [['日期', '出席', '缺席', '出席率']],
     body: dailyData,
     theme: 'grid',
     headStyles: { fillColor: [39, 174, 96], textColor: 255 },
@@ -2516,7 +2529,7 @@ async function exportMonthPDF() {
     doc.setPage(i);
     doc.setFontSize(8);
     doc.setTextColor(128, 128, 128);
-    doc.text(`Generated: ${new Date().toLocaleString()} | Page ${i} of ${pageCount}`, 105, 287, { align: 'center' });
+    doc.text(`生成時間：${new Date().toLocaleString('zh-TW')} | 第 ${i} 頁，共 ${pageCount} 頁`, 105, 287, { align: 'center' });
   }
   
   doc.save(`Monthly_Report_${selectedMonth}.pdf`);
