@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>保良局羅氏基金中學 - 樂器班點名系統</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: "Microsoft JhengHei", "PingFang TC", sans-serif; background: #f0f2f5; color: #333; }
@@ -2223,6 +2226,551 @@ function showToast(msg, isError = false) {
   toast.className = isError ? 'toast error' : 'toast';
   toast.style.display = 'block';
   setTimeout(() => { toast.style.display = 'none'; }, 3000);
+}
+
+
+
+// ============================================
+// PDF EXPORT & CHART FUNCTIONS
+// ============================================
+
+// Export single day report as PDF
+async function exportDayPDF() {
+  const { jsPDF } = window.jspdf;
+  
+  showToast('正在生成 PDF 報告...');
+  
+  const selectedDate = document.getElementById('filter-date').value;
+  const rows = adminReportRows.filter(r => r.date === selectedDate);
+  
+  if (!rows.length) {
+    showToast('該日期沒有記錄', true);
+    return;
+  }
+  
+  const doc = new jsPDF('p', 'mm', 'a4');
+  
+  // Title
+  doc.setFontSize(18);
+  doc.setTextColor(26, 82, 118);
+  doc.text('Po Leung Kuk Laws Foundation College', 105, 15, { align: 'center' });
+  
+  doc.setFontSize(14);
+  doc.text('Music Class Attendance Report', 105, 22, { align: 'center' });
+  
+  // Date
+  doc.setFontSize(12);
+  doc.setTextColor(68, 68, 68);
+  const dateObj = new Date(selectedDate + 'T00:00:00');
+  doc.text(`Date: ${dateObj.getFullYear()}-${String(dateObj.getMonth()+1).padStart(2,'0')}-${String(dateObj.getDate()).padStart(2,'0')}`, 105, 30, { align: 'center' });
+  
+  // Statistics
+  const totalStudents = rows.length;
+  const presentCount = rows.filter(r => r.submitted && r.status === 'present').length;
+  const absentCount = rows.filter(r => r.submitted && r.status === 'absent').length;
+  const pendingCount = rows.filter(r => !r.submitted).length;
+  
+  doc.setFontSize(11);
+  doc.setTextColor(0, 0, 0);
+  doc.text(`Total: ${totalStudents} | Present: ${presentCount} | Absent: ${absentCount} | Pending: ${pendingCount}`, 105, 38, { align: 'center' });
+  
+  // Group by class
+  const grouped = {};
+  rows.forEach(r => {
+    const key = `${r.tutor}|||${r.instrument}|||${r.time}|||${r.room}`;
+    if (!grouped[key]) grouped[key] = [];
+    grouped[key].push(r);
+  });
+  
+  let startY = 48;
+  
+  Object.entries(grouped).forEach(([key, students]) => {
+    const [tutor, instrument, time, room] = key.split('|||');
+    const classPresent = students.filter(s => s.submitted && s.status === 'present').length;
+    
+    // Check if new page needed
+    if (startY > 250) {
+      doc.addPage();
+      startY = 20;
+    }
+    
+    // Class header
+    doc.setFillColor(219, 234, 254);
+    doc.rect(10, startY, 190, 8, 'F');
+    doc.setFontSize(10);
+    doc.setTextColor(26, 82, 118);
+    doc.text(`${instrument} | Tutor: ${tutor} | ${time} | Room: ${room} | ${classPresent}/${students.length}`, 12, startY + 5.5);
+    
+    // Table
+    const tableData = students.map(s => [
+      s.classNo,
+      s.name,
+      s.submitted ? (s.status === 'present' ? 'Present' : 'Absent') : 'Pending',
+      s.reason || ''
+    ]);
+    
+    doc.autoTable({
+      startY: startY + 10,
+      head: [['Class No.', 'Name', 'Status', 'Reason']],
+      body: tableData,
+      theme: 'grid',
+      headStyles: { fillColor: [26, 82, 118], textColor: 255, fontSize: 9 },
+      bodyStyles: { fontSize: 9 },
+      columnStyles: {
+        0: { cellWidth: 25 },
+        1: { cellWidth: 50 },
+        2: { cellWidth: 25, halign: 'center' },
+        3: { cellWidth: 90 }
+      },
+      didParseCell: function(data) {
+        if (data.section === 'body' && data.column.index === 2) {
+          if (data.cell.raw === 'Present') {
+            data.cell.styles.textColor = [39, 174, 96];
+          } else if (data.cell.raw === 'Absent') {
+            data.cell.styles.textColor = [231, 76, 60];
+          } else {
+            data.cell.styles.textColor = [149, 165, 166];
+          }
+        }
+      }
+    });
+    
+    startY = doc.lastAutoTable.finalY + 8;
+  });
+  
+  // Footer
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8);
+    doc.setTextColor(128, 128, 128);
+    doc.text(`Generated: ${new Date().toLocaleString()} | Page ${i} of ${pageCount}`, 105, 287, { align: 'center' });
+  }
+  
+  doc.save(`Attendance_Report_${selectedDate}.pdf`);
+  showToast('PDF 報告已匯出');
+}
+
+// Export monthly report as PDF
+async function exportMonthPDF() {
+  const { jsPDF } = window.jspdf;
+  
+  showToast('正在生成月份 PDF 報告...');
+  
+  const selectedMonth = document.getElementById('filter-month').value;
+  const monthDates = CLASS_DATES.filter(d => d.startsWith(selectedMonth));
+  
+  if (!monthDates.length) {
+    showToast('該月份沒有上課日期', true);
+    return;
+  }
+  
+  // Fetch all records for statistics
+  const allRecords = [];
+  for (const date of monthDates) {
+    try {
+      await fetchRecords(date);
+      const records = getRecords();
+      allRecords.push(...records.filter(r => r.date === date));
+    } catch (e) {
+      console.error('Error fetching records for', date, e);
+    }
+  }
+  
+  const stats = calculateMonthStats(allRecords, monthDates);
+  
+  const doc = new jsPDF('p', 'mm', 'a4');
+  
+  // Title Page
+  doc.setFontSize(20);
+  doc.setTextColor(26, 82, 118);
+  doc.text('Monthly Attendance Report', 105, 30, { align: 'center' });
+  
+  doc.setFontSize(14);
+  doc.setTextColor(68, 68, 68);
+  const [year, month] = selectedMonth.split('-');
+  doc.text(`${year}年${MONTH_NAMES[parseInt(month)-1]}`, 105, 40, { align: 'center' });
+  
+  // Summary Statistics
+  doc.setFontSize(12);
+  doc.setTextColor(0, 0, 0);
+  doc.text('Summary Statistics', 20, 60);
+  
+  doc.setFontSize(10);
+  doc.text(`Total Classes: ${stats.totalClasses}`, 20, 70);
+  doc.text(`Total Students: ${stats.totalStudents}`, 20, 77);
+  doc.text(`Average Attendance Rate: ${stats.avgAttendanceRate}%`, 20, 84);
+  doc.text(`Total Present: ${stats.totalPresent}`, 20, 91);
+  doc.text(`Total Absent: ${stats.totalAbsent}`, 20, 98);
+  
+  // Attendance by Class
+  doc.setFontSize(12);
+  doc.text('Attendance by Class', 20, 115);
+  
+  const classStatsData = Object.entries(stats.byClass).map(([className, data]) => [
+    className,
+    data.total,
+    data.present,
+    data.absent,
+    `${data.rate}%`
+  ]);
+  
+  doc.autoTable({
+    startY: 120,
+    head: [['Class', 'Total', 'Present', 'Absent', 'Rate']],
+    body: classStatsData,
+    theme: 'grid',
+    headStyles: { fillColor: [26, 82, 118], textColor: 255 },
+    styles: { fontSize: 9 }
+  });
+  
+  // Absence Reasons
+  if (Object.keys(stats.absenceReasons).length > 0) {
+    doc.addPage();
+    doc.setFontSize(14);
+    doc.setTextColor(26, 82, 118);
+    doc.text('Absence Analysis', 105, 20, { align: 'center' });
+    
+    const reasonData = Object.entries(stats.absenceReasons).map(([reason, count]) => [
+      reason,
+      count,
+      `${((count / stats.totalAbsent) * 100).toFixed(1)}%`
+    ]);
+    
+    doc.autoTable({
+      startY: 30,
+      head: [['Reason', 'Count', 'Percentage']],
+      body: reasonData,
+      theme: 'grid',
+      headStyles: { fillColor: [231, 76, 60], textColor: 255 },
+      styles: { fontSize: 10 }
+    });
+  }
+  
+  // Daily Attendance Trend
+  doc.addPage();
+  doc.setFontSize(14);
+  doc.setTextColor(26, 82, 118);
+  doc.text('Daily Attendance Trend', 105, 20, { align: 'center' });
+  
+  const dailyData = monthDates.map(date => {
+    const dayRecords = allRecords.filter(r => r.date === date);
+    const present = dayRecords.reduce((sum, r) => {
+      return sum + Object.values(r.entries || {}).filter(e => e.status === 'present').length;
+    }, 0);
+    const total = dayRecords.reduce((sum, r) => {
+      return sum + Object.values(r.entries || {}).length;
+    }, 0);
+    return [
+      date.substring(8),
+      present,
+      total - present,
+      total > 0 ? `${((present / total) * 100).toFixed(1)}%` : '0%'
+    ];
+  });
+  
+  doc.autoTable({
+    startY: 30,
+    head: [['Date', 'Present', 'Absent', 'Rate']],
+    body: dailyData,
+    theme: 'grid',
+    headStyles: { fillColor: [39, 174, 96], textColor: 255 },
+    styles: { fontSize: 9 }
+  });
+  
+  // Footer
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8);
+    doc.setTextColor(128, 128, 128);
+    doc.text(`Generated: ${new Date().toLocaleString()} | Page ${i} of ${pageCount}`, 105, 287, { align: 'center' });
+  }
+  
+  doc.save(`Monthly_Report_${selectedMonth}.pdf`);
+  showToast('月份 PDF 報告已匯出');
+}
+
+// Calculate statistics for monthly report
+function calculateMonthStats(records, monthDates) {
+  const stats = {
+    totalClasses: 0,
+    totalStudents: 0,
+    totalPresent: 0,
+    totalAbsent: 0,
+    byClass: {},
+    absenceReasons: {},
+    dailyRates: []
+  };
+  
+  const uniqueStudents = new Set();
+  
+  records.forEach(record => {
+    if (record.entries) {
+      Object.values(record.entries).forEach(entry => {
+        uniqueStudents.add(`${entry.classNo}_${entry.name}`);
+        
+        const className = entry.instrument || 'Unknown';
+        if (!stats.byClass[className]) {
+          stats.byClass[className] = { total: 0, present: 0, absent: 0 };
+        }
+        stats.byClass[className].total++;
+        
+        if (entry.status === 'present') {
+          stats.totalPresent++;
+          stats.byClass[className].present++;
+        } else {
+          stats.totalAbsent++;
+          stats.byClass[className].absent++;
+          
+          if (entry.reason) {
+            stats.absenceReasons[entry.reason] = (stats.absenceReasons[entry.reason] || 0) + 1;
+          }
+        }
+      });
+    }
+  });
+  
+  stats.totalStudents = uniqueStudents.size;
+  stats.totalClasses = Object.keys(stats.byClass).length;
+  
+  const total = stats.totalPresent + stats.totalAbsent;
+  stats.avgAttendanceRate = total > 0 ? ((stats.totalPresent / total) * 100).toFixed(1) : 0;
+  
+  Object.keys(stats.byClass).forEach(className => {
+    const c = stats.byClass[className];
+    c.rate = c.total > 0 ? ((c.present / c.total) * 100).toFixed(1) : 0;
+  });
+  
+  return stats;
+}
+
+// Display charts in admin panel
+async function showMonthCharts() {
+  const selectedMonth = document.getElementById('filter-month').value;
+  const monthDates = CLASS_DATES.filter(d => d.startsWith(selectedMonth));
+  
+  if (!monthDates.length) {
+    showToast('該月份沒有上課日期', true);
+    return;
+  }
+  
+  showToast('正在載入統計圖表...');
+  
+  const allRecords = [];
+  for (const date of monthDates) {
+    try {
+      await fetchRecords(date);
+      const records = getRecords();
+      allRecords.push(...records.filter(r => r.date === date));
+    } catch (e) {
+      console.error('Error fetching records for', date, e);
+    }
+  }
+  
+  const stats = calculateMonthStats(allRecords, monthDates);
+  
+  // Create chart modal
+  const modal = document.createElement('div');
+  modal.id = 'chart-modal';
+  modal.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.7);
+    z-index: 1000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+  `;
+  
+  const [year, month] = selectedMonth.split('-');
+  
+  modal.innerHTML = `
+    <div style="
+      background: white;
+      border-radius: 12px;
+      max-width: 900px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      padding: 30px;
+    ">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2 style="color: #1a5276; margin: 0;">${year}年${MONTH_NAMES[parseInt(month)-1]} 統計圖表</h2>
+        <button onclick="closeChartModal()" style="
+          background: #e74c3c;
+          color: white;
+          border: none;
+          padding: 8px 16px;
+          border-radius: 6px;
+          cursor: pointer;
+        ">關閉</button>
+      </div>
+      
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 30px;">
+        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; text-align: center;">
+          <div style="font-size: 32px; font-weight: bold; color: #2980b9;">${stats.totalStudents}</div>
+          <div style="color: #666;">總學生數</div>
+        </div>
+        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; text-align: center;">
+          <div style="font-size: 32px; font-weight: bold; color: #27ae60;">${stats.avgAttendanceRate}%</div>
+          <div style="color: #666;">平均出席率</div>
+        </div>
+        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; text-align: center;">
+          <div style="font-size: 32px; font-weight: bold; color: #e74c3c;">${stats.totalAbsent}</div>
+          <div style="color: #666;">總缺席次數</div>
+        </div>
+      </div>
+      
+      <div style="margin-bottom: 30px;">
+        <h3 style="color: #333; margin-bottom: 15px;">各班出席率</h3>
+        <canvas id="classChart" style="max-height: 300px;"></canvas>
+      </div>
+      
+      <div style="margin-bottom: 30px;">
+        <h3 style="color: #333; margin-bottom: 15px;">每日出席趨勢</h3>
+        <canvas id="dailyChart" style="max-height: 250px;"></canvas>
+      </div>
+      
+      ${Object.keys(stats.absenceReasons).length > 0 ? `
+      <div>
+        <h3 style="color: #333; margin-bottom: 15px;">缺席原因分佈</h3>
+        <canvas id="reasonChart" style="max-height: 250px;"></canvas>
+      </div>
+      ` : ''}
+    </div>
+  `;
+  
+  document.body.appendChild(modal);
+  
+  // Create charts
+  createClassChart(stats);
+  createDailyChart(stats, monthDates, allRecords);
+  if (Object.keys(stats.absenceReasons).length > 0) {
+    createReasonChart(stats);
+  }
+}
+
+function closeChartModal() {
+  const modal = document.getElementById('chart-modal');
+  if (modal) modal.remove();
+}
+
+function createClassChart(stats) {
+  const ctx = document.getElementById('classChart').getContext('2d');
+  const labels = Object.keys(stats.byClass);
+  const data = labels.map(l => parseFloat(stats.byClass[l].rate));
+  
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: '出席率 (%)',
+        data: data,
+        backgroundColor: data.map(v => v >= 90 ? '#27ae60' : v >= 80 ? '#f39c12' : '#e74c3c'),
+        borderWidth: 0
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: {
+          beginAtZero: true,
+          max: 100,
+          ticks: { callback: v => v + '%' }
+        }
+      },
+      plugins: {
+        legend: { display: false }
+      }
+    }
+  });
+}
+
+function createDailyChart(stats, monthDates, allRecords) {
+  const ctx = document.getElementById('dailyChart').getContext('2d');
+  
+  const labels = monthDates.map(d => d.substring(8) + '日');
+  const presentData = monthDates.map(date => {
+    const dayRecords = allRecords.filter(r => r.date === date);
+    return dayRecords.reduce((sum, r) => {
+      return sum + Object.values(r.entries || {}).filter(e => e.status === 'present').length;
+    }, 0);
+  });
+  const absentData = monthDates.map(date => {
+    const dayRecords = allRecords.filter(r => r.date === date);
+    return dayRecords.reduce((sum, r) => {
+      return sum + Object.values(r.entries || {}).filter(e => e.status === 'absent').length;
+    }, 0);
+  });
+  
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: '出席',
+          data: presentData,
+          borderColor: '#27ae60',
+          backgroundColor: 'rgba(39, 174, 96, 0.1)',
+          fill: true,
+          tension: 0.3
+        },
+        {
+          label: '缺席',
+          data: absentData,
+          borderColor: '#e74c3c',
+          backgroundColor: 'rgba(231, 76, 60, 0.1)',
+          fill: true,
+          tension: 0.3
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: { beginAtZero: true }
+      }
+    }
+  });
+}
+
+function createReasonChart(stats) {
+  const ctx = document.getElementById('reasonChart').getContext('2d');
+  const labels = Object.keys(stats.absenceReasons);
+  const data = labels.map(l => stats.absenceReasons[l]);
+  
+  const colors = ['#e74c3c', '#f39c12', '#f1c40f', '#9b59b6', '#3498db', '#1abc9c'];
+  
+  new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: labels,
+      datasets: [{
+        data: data,
+        backgroundColor: colors.slice(0, labels.length),
+        borderWidth: 2,
+        borderColor: '#fff'
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'right'
+        }
+      }
+    }
+  });
 }
 
 // ==================== START ====================
