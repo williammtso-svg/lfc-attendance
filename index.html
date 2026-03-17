@@ -217,7 +217,13 @@ body { font-family: "Microsoft JhengHei", "PingFang TC", sans-serif; background:
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
         <h4>出席報告（全部學生）</h4>
         <div style="display: flex; gap: 10px;">
-          <button class="btn btn-success" onclick="exportMonthCSV()">匯出月份報告 (Excel)</button>
+          <button class="btn btn-success" onclick="exportMonthCSV()">匯出月份報告 (Excel)
+        </button>
+        <button class="btn btn-primary" onclick="exportMonthPDF()">
+          📊 匯出月份 PDF
+        </button>
+        <button class="btn btn-success" onclick="showMonthCharts()">
+          📈 查看統計圖表</button>
           <button class="btn btn-secondary" onclick="exportCSV()">匯出單日報告 (Excel)</button>
         </div>
       </div>
