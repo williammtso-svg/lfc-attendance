@@ -1269,7 +1269,7 @@ async function loadMonthReport() {
 
     // 2. Rebuild table header with date columns
     const thead = document.getElementById('report-table').getElementsByTagName('thead')[0];
-    let headerHtml = '<tr><th>樂器</th><th>班別學號</th><th>學生姓名</th>';
+    let headerHtml = '<tr><th>班別學號</th><th>學生姓名</th>';
     selectedMonthDates.forEach(date => {
       const d = new Date(date + 'T00:00:00');
       const dayName = DAY_OF_WEEK[d.getDay()];
@@ -1323,7 +1323,7 @@ async function loadMonthReport() {
     ];
     let colorIdx = 0;
     const totalDateCols = selectedMonthDates.length;
-    const totalCols = 3 + totalDateCols + 2;
+    const totalCols = 2 + totalDateCols + 2;
     let html = '';
 
     Object.values(instrumentGroups).forEach(group => {
@@ -1354,7 +1354,7 @@ async function loadMonthReport() {
           }
         });
 
-        html += `<tr style="background:${stripeBg};"><td>${group.instrument}</td><td>${student.classNo}</td><td>${student.name}</td>${dateCells}<td style="text-align:center; color:#27ae60; font-weight:bold;">${presentCount}</td><td style="text-align:center; color:#e74c3c; font-weight:bold;">${absentCount}</td></tr>`;
+        html += `<tr style="background:${stripeBg};"><td>${student.classNo}</td><td>${student.name}</td>${dateCells}<td style="text-align:center; color:#27ae60; font-weight:bold;">${presentCount}</td><td style="text-align:center; color:#e74c3c; font-weight:bold;">${absentCount}</td></tr>`;
       });
     });
 
