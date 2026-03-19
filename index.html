@@ -1214,6 +1214,9 @@ function onFilterModeChange() {
   } else {
     dateContainer.style.display = 'flex';
     monthContainer.style.display = 'none';
+    // Reset table header to single-date format
+    const thead = document.getElementById('report-table').getElementsByTagName('thead')[0];
+    thead.innerHTML = '<tr><th>導師</th><th>樂器</th><th>時間</th><th>課室</th><th>班別學號</th><th>學生姓名</th><th>狀態</th><th>缺席原因</th></tr>';
     loadReport();
   }
 }
@@ -1222,6 +1225,147 @@ function onMonthChange() {
   const selectedMonth = document.getElementById('filter-month').value;
   selectedMonthDates = CLASS_DATES.filter(d => d.startsWith(selectedMonth));
   loadMonthReport();
+}
+
+async function loadMonthReport() {
+  if (!selectedMonthDates.length) {
+    document.getElementById('tutor-status-list').innerHTML = '<span style="color:#999;">該月份沒有上課日期</span>';
+    document.getElementById('report-table').getElementsByTagName('tbody')[0].innerHTML = '';
+    return;
+  }
+
+  document.getElementById('tutor-status-list').innerHTML = '<span style="color:#999;">載入中...</span>';
+  document.getElementById('report-table').getElementsByTagName('tbody')[0].innerHTML = '<tr><td colspan="8" style="text-align:center; color:#999; padding:20px;">載入中...</td></tr>';
+
+  try {
+    // Fetch all records for this month
+    const allRecords = [];
+    for (const date of selectedMonthDates) {
+      try {
+        await fetchRecords(date);
+        const records = getRecords();
+        allRecords.push(...records.filter(r => r.date === date));
+      } catch (err) {
+        console.error('Failed to fetch records for date:', date, err);
+      }
+    }
+
+    const tutorNames = Object.keys(TUTOR_DATA);
+
+    // 1. Tutor submission status per date
+    const statusHtml = [];
+    tutorNames.forEach(tutor => {
+      const dateStatuses = selectedMonthDates.map(date => {
+        const submitted = allRecords.some(r => r.date === date && r.tutor.trim() === tutor.trim());
+        const d = new Date(date + 'T00:00:00');
+        const label = `${d.getDate()}/${d.getMonth()+1}`;
+        return submitted
+          ? `<span style="color:#27ae60; font-size:11px;">${label}✅</span>`
+          : `<span style="color:#e74c3c; font-size:11px;">${label}❌</span>`;
+      }).join(' ');
+      statusHtml.push(`<div style="margin:4px 0; padding:6px 12px; border-radius:6px; background:#f8f9fa; font-size:13px; border:1px solid #ddd;"><b>${tutor}</b>：${dateStatuses}</div>`);
+    });
+    document.getElementById('tutor-status-list').innerHTML = statusHtml.join('');
+
+    // 2. Rebuild table header with date columns
+    const thead = document.getElementById('report-table').getElementsByTagName('thead')[0];
+    let headerHtml = '<tr><th>樂器</th><th>班別學號</th><th>學生姓名</th>';
+    selectedMonthDates.forEach(date => {
+      const d = new Date(date + 'T00:00:00');
+      const dayName = DAY_OF_WEEK[d.getDay()];
+      headerHtml += `<th style="text-align:center; min-width:60px;">${d.getDate()}/${d.getMonth()+1}<br>(${dayName})</th>`;
+    });
+    headerHtml += '<th>出席</th><th>缺席</th></tr>';
+    thead.innerHTML = headerHtml;
+
+    // 3. Build rows grouped by instrument class
+    const instrumentGroups = {};
+    tutorNames.forEach(tutor => {
+      const instruments = TUTOR_DATA[tutor];
+      Object.keys(instruments).forEach(instrument => {
+        const info = instruments[instrument];
+        const groupKey = `${instrument}|||${tutor}|||${info.time}|||${info.room}`;
+
+        if (!instrumentGroups[groupKey]) {
+          instrumentGroups[groupKey] = {
+            tutor, instrument, time: info.time, room: info.room, students: []
+          };
+        }
+
+        info.students.forEach(student => {
+          const attendanceByDate = {};
+          selectedMonthDates.forEach(date => {
+            const record = allRecords.find(r => r.date === date && r.tutor.trim() === tutor.trim());
+            let status = '', reason = '', submitted = false;
+            if (record && record.entries) {
+              const entryKey = `${instrument}__${student.class_no}__${student.name}`;
+              let entry = record.entries[entryKey];
+              if (!entry) {
+                entry = Object.values(record.entries).find(e =>
+                  e.name.trim() === student.name.trim() && e.instrument.trim() === instrument.trim()
+                );
+              }
+              if (entry) { status = entry.status; reason = entry.reason || ''; submitted = true; }
+            }
+            attendanceByDate[date] = { status, reason, submitted };
+          });
+          instrumentGroups[groupKey].students.push({
+            classNo: student.class_no, name: student.name, attendanceByDate
+          });
+        });
+      });
+    });
+
+    // 4. Render table
+    const CLASS_COLORS = [
+      '#dbeafe', '#fef3c7', '#d1fae5', '#ede9fe', '#fce7f3',
+      '#cffafe', '#fde68a', '#bbf7d0', '#ddd6fe', '#fbcfe8'
+    ];
+    let colorIdx = 0;
+    const totalDateCols = selectedMonthDates.length;
+    const totalCols = 3 + totalDateCols + 2;
+    let html = '';
+
+    Object.values(instrumentGroups).forEach(group => {
+      if (group.students.length === 0) return;
+      const bg = CLASS_COLORS[colorIdx % CLASS_COLORS.length];
+      colorIdx++;
+
+      // Group header row
+      html += `<tr style="background:${bg};"><td colspan="${totalCols}" style="padding:10px 15px; font-weight:bold; font-size:14px; color:#1a5276; border-top:2px solid #1a5276;"><b>${group.instrument}</b>　　導師：${group.tutor}　　時間：${group.time}　　課室：${group.room}</td></tr>`;
+
+      // Student rows
+      group.students.forEach((student, si) => {
+        const stripeBg = si % 2 === 0 ? '#fff' : '#f8f9fa';
+        let presentCount = 0, absentCount = 0;
+        let dateCells = '';
+
+        selectedMonthDates.forEach(date => {
+          const att = student.attendanceByDate[date];
+          if (!att.submitted) {
+            dateCells += `<td style="text-align:center; color:#aaa;">-</td>`;
+          } else if (att.status === 'present') {
+            dateCells += `<td style="text-align:center; color:#27ae60; font-weight:bold;">✓</td>`;
+            presentCount++;
+          } else {
+            const tip = att.reason ? ` title="${att.reason}"` : '';
+            dateCells += `<td style="text-align:center; color:#e74c3c; font-weight:bold; cursor:${att.reason ? 'help' : 'default'};"${tip}>✗</td>`;
+            absentCount++;
+          }
+        });
+
+        html += `<tr style="background:${stripeBg};"><td>${group.instrument}</td><td>${student.classNo}</td><td>${student.name}</td>${dateCells}<td style="text-align:center; color:#27ae60; font-weight:bold;">${presentCount}</td><td style="text-align:center; color:#e74c3c; font-weight:bold;">${absentCount}</td></tr>`;
+      });
+    });
+
+    document.getElementById('report-table').getElementsByTagName('tbody')[0].innerHTML = html;
+
+  } catch (err) {
+    console.error('loadMonthReport error:', err);
+    document.getElementById('tutor-status-list').innerHTML = '<span style="color:#e74c3c;">載入失敗：' + err.message + '</span>';
+    document.getElementById('report-table').getElementsByTagName('tbody')[0].innerHTML = '';
+    showToast('載入失敗: ' + err.message, true);
+  }
 }
 
 // ==================== LOGIN / LOGOUT ====================
