@@ -1343,7 +1343,7 @@ async function loadMonthReport() {
         selectedMonthDates.forEach(date => {
           const att = student.attendanceByDate[date];
           if (!att.submitted) {
-            dateCells += `<td style="text-align:center; color:#aaa;">-</td>`;
+            dateCells += `<td style="text-align:center; color:#e74c3c; font-size:11px;">導師未點名</td>`;
           } else if (att.status === 'present') {
             dateCells += `<td style="text-align:center; color:#27ae60; font-weight:bold;">✓</td>`;
             presentCount++;
