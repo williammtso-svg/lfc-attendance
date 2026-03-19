@@ -2162,7 +2162,7 @@ async function exportMonthExcelByInstrument() {
         monthDates.forEach(date => {
           const att = student.attendanceByDate[date];
           if (!att.submitted) {
-            row.push('-');
+            row.push('導師未點名');
           } else if (att.status === 'present') {
             row.push('✓');
             presentCount++;
